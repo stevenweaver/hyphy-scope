@@ -92,33 +92,28 @@ export function createDnDsPlot(data: SiteData[]): any {
 }
 
 /**
- * Creates an Observable Plot for alpha/beta rate estimates
+ * Creates an Observable Plot for alpha/beta rate estimates matching the original FEL visualization
  */
 export function createAlphaBetaPlot(data: SiteData[]): any {
-  // Prepare data for stacked bars
-  const processedData = data.flatMap(d => [
-    {
-      codon: d.codon,
-      rate: -Math.min(d.alpha, DYN_RANGE_CAP),
-      type: "alpha",
-      class: d.class,
-      neutralRate: -Math.min(d["alpha=beta"], DYN_RANGE_CAP)
-    },
-    {
-      codon: d.codon,
-      rate: Math.min(d.beta, DYN_RANGE_CAP),
-      type: "beta",
-      class: d.class,
-      neutralRate: Math.min(d["alpha=beta"], DYN_RANGE_CAP)
-    }
-  ]);
+  // Process data and cap values
+  const processedData = data.map(d => ({
+    codon: d.codon,
+    alpha: -Math.min(d.alpha, DYN_RANGE_CAP), // Negative for downward bars
+    beta: Math.min(d.beta, DYN_RANGE_CAP),    // Positive for upward bars
+    neutral: Math.min(d["alpha=beta"], DYN_RANGE_CAP),
+    class: d.class,
+    partition: d.partition
+  }));
 
-  const yMax = Math.max(...processedData.map(d => Math.abs(d.rate)));
+  const yMax = Math.max(
+    ...processedData.map(d => Math.max(Math.abs(d.alpha), d.beta))
+  );
 
   return Plot.plot({
     width: 800,
     height: 400,
-    marginBottom: 40,
+    marginLeft: 60,
+    marginBottom: 50,
     x: {
       label: "Codon",
       tickFormat: d => d.toString()
@@ -129,52 +124,68 @@ export function createAlphaBetaPlot(data: SiteData[]): any {
       grid: true,
       tickFormat: d => {
         const absVal = Math.abs(d);
-        return d < 0 ? `α = ${absVal}` : (d === 0 ? "0" : `β = ${absVal}`);
+        if (d > 0) return `β = ${absVal.toFixed(1)}`;
+        if (d < 0) return `α = ${absVal.toFixed(1)}`;
+        return "0";
       }
     },
     color: {
-      type: "categorical",
+      type: "categorical", 
       domain: Object.keys(COLORS),
-      range: Object.values(COLORS),
-      legend: true
+      range: Object.values(COLORS)
     },
     marks: [
-      // Zero line
-      Plot.ruleY([0], { stroke: "gray", strokeOpacity: 0.5, strokeWidth: 2 }),
-      
-      // Alpha bars (negative)
-      Plot.barY(processedData.filter(d => d.type === "alpha"), {
-        x: "codon",
-        y: "rate",
-        fill: "class",
-        fillOpacity: 0.7,
-        tip: true
+      // Zero reference line
+      Plot.ruleY([0], { 
+        stroke: "gray", 
+        strokeOpacity: 0.5, 
+        strokeWidth: 1 
       }),
       
-      // Beta bars (positive)
-      Plot.barY(processedData.filter(d => d.type === "beta"), {
-        x: "codon",
-        y: "rate",
+      // Alpha bars (negative, extending downward)
+      Plot.rect(processedData, {
+        x: d => d.codon - 0.4,
+        x2: d => d.codon + 0.4,
+        y: 0,
+        y2: "alpha",
         fill: "class",
-        fillOpacity: 0.7,
-        tip: true
+        stroke: "white",
+        strokeWidth: 0.5,
+        fillOpacity: 0.8
       }),
       
-      // Neutral rate lines
-      Plot.link(
-        data.map(d => ({
-          codon: d.codon,
-          y1: -Math.min(d["alpha=beta"], DYN_RANGE_CAP),
-          y2: Math.min(d["alpha=beta"], DYN_RANGE_CAP)
-        })),
-        {
-          x: "codon",
-          y1: "y1",
-          y2: "y2",
-          stroke: "#444",
-          strokeWidth: 1
-        }
-      )
+      // Beta bars (positive, extending upward) 
+      Plot.rect(processedData, {
+        x: d => d.codon - 0.4,
+        x2: d => d.codon + 0.4,
+        y: 0,
+        y2: "beta",
+        fill: "class", 
+        stroke: "white",
+        strokeWidth: 0.5,
+        fillOpacity: 0.8
+      }),
+      
+      // Neutral rate horizontal lines (connecting alpha=beta estimates)
+      Plot.link(processedData, {
+        x: d => d.codon - 0.4,
+        x2: d => d.codon + 0.4,
+        y: "neutral",
+        y2: "neutral",
+        stroke: "#333",
+        strokeWidth: 2,
+        strokeOpacity: 0.8
+      }),
+      
+      // Add tooltips with invisible rects
+      Plot.rect(processedData, {
+        x: d => d.codon - 0.4,
+        x2: d => d.codon + 0.4,
+        y: "alpha",
+        y2: "beta",
+        fill: "transparent",
+        title: d => `Codon ${d.codon}\nα = ${Math.abs(d.alpha).toFixed(3)}\nβ = ${d.beta.toFixed(3)}\nα=β = ${d.neutral.toFixed(3)}\nClass: ${d.class}`
+      })
     ]
   });
 }

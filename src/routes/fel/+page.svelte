@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { SimpleFelVisualization, loadDataFromUrl, loadDataFromStorage } from '$lib';
+  import { FelVisualization, loadDataFromUrl, loadDataFromStorage } from '$lib';
   import { getTestData } from '$lib/data/data-loader';
 
   let data: any = null;
@@ -208,7 +208,7 @@
   {#if data}
     <div class="visualization-section">
       <h2>Analysis Results</h2>
-      <SimpleFelVisualization {data} />
+      <FelVisualization {data} />
     </div>
   {:else if !loading && !error}
     <div class="no-data">

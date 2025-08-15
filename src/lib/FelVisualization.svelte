@@ -26,6 +26,62 @@
   let plotDescription: string = "";
   let availablePlotTypes: string[] = [];
   let plotContainer: HTMLElement;
+  
+  // Pagination variables
+  let currentPage = 1;
+  let itemsPerPage = 50;
+  
+  // Sorting variables
+  let sortColumn = "Site";
+  let sortDirection: "asc" | "desc" = "asc";
+  
+  $: sortedData = [...filteredSiteData].sort((a, b) => {
+    const aVal = a[sortColumn];
+    const bVal = b[sortColumn];
+    
+    // Handle numeric values
+    if (typeof aVal === 'number' && typeof bVal === 'number') {
+      return sortDirection === "asc" ? aVal - bVal : bVal - aVal;
+    }
+    
+    // Handle string values
+    const aStr = String(aVal).toLowerCase();
+    const bStr = String(bVal).toLowerCase();
+    
+    if (sortDirection === "asc") {
+      return aStr < bStr ? -1 : aStr > bStr ? 1 : 0;
+    } else {
+      return aStr > bStr ? -1 : aStr < bStr ? 1 : 0;
+    }
+  });
+  
+  $: totalPages = Math.ceil(sortedData.length / itemsPerPage);
+  $: paginatedData = sortedData.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+  
+  function goToPage(page: number) {
+    currentPage = Math.max(1, Math.min(page, totalPages));
+  }
+  
+  function nextPage() {
+    if (currentPage < totalPages) currentPage++;
+  }
+  
+  function prevPage() {
+    if (currentPage > 1) currentPage--;
+  }
+  
+  function handleSort(column: string) {
+    if (sortColumn === column) {
+      // Toggle direction if same column
+      sortDirection = sortDirection === "asc" ? "desc" : "asc";
+    } else {
+      // New column, default to ascending
+      sortColumn = column;
+      sortDirection = "asc";
+    }
+    // Reset to first page when sorting changes
+    currentPage = 1;
+  }
 
   $: if (data) {
     processData();
@@ -36,6 +92,7 @@
     filteredSiteData = sitesTable[0].filter(x => 
       showColumns.includes(x.class) && (!filteredSiteData.length || inSet.has(x.codon))
     );
+    currentPage = 1; // Reset to first page when filters change
     updatePlot();
   }
 
@@ -191,12 +248,27 @@
             <thead>
               <tr>
                 {#each sitesTable[1] as [key, description]}
-                  <th title={description}>{key}</th>
+                  <th 
+                    title={description}
+                    class="sortable {sortColumn === key ? 'sorted' : ''}"
+                    on:click={() => handleSort(key)}
+                  >
+                    <span class="header-content">
+                      {key}
+                      <span class="sort-indicator">
+                        {#if sortColumn === key}
+                          {sortDirection === "asc" ? "↑" : "↓"}
+                        {:else}
+                          ↕
+                        {/if}
+                      </span>
+                    </span>
+                  </th>
                 {/each}
               </tr>
             </thead>
             <tbody>
-              {#each filteredSiteData.slice(0, 50) as row}
+              {#each paginatedData as row}
                 <tr>
                   {#each sitesTable[1] as [key]}
                     <td>
@@ -208,8 +280,85 @@
             </tbody>
           </table>
           
-          {#if filteredSiteData.length > 50}
-            <p class="table-note">Showing first 50 of {filteredSiteData.length} results</p>
+          <!-- Pagination Controls -->
+          {#if totalPages > 1}
+            <div class="pagination">
+              <div class="pagination-info">
+                Showing {(currentPage - 1) * itemsPerPage + 1}-{Math.min(currentPage * itemsPerPage, sortedData.length)} of {sortedData.length} results
+              </div>
+              
+              <div class="pagination-controls">
+                <button 
+                  on:click={prevPage} 
+                  disabled={currentPage === 1}
+                  class="page-btn"
+                >
+                  Previous
+                </button>
+                
+                {#if totalPages <= 7}
+                  {#each Array(totalPages).fill(0) as _, i}
+                    <button 
+                      on:click={() => goToPage(i + 1)}
+                      class="page-btn {currentPage === i + 1 ? 'active' : ''}"
+                    >
+                      {i + 1}
+                    </button>
+                  {/each}
+                {:else}
+                  <button 
+                    on:click={() => goToPage(1)}
+                    class="page-btn {currentPage === 1 ? 'active' : ''}"
+                  >
+                    1
+                  </button>
+                  
+                  {#if currentPage > 3}
+                    <span class="ellipsis">...</span>
+                  {/if}
+                  
+                  {#each Array(3).fill(0) as _, i}
+                    {#if currentPage + i - 1 > 1 && currentPage + i - 1 < totalPages}
+                      <button 
+                        on:click={() => goToPage(currentPage + i - 1)}
+                        class="page-btn {currentPage === currentPage + i - 1 ? 'active' : ''}"
+                      >
+                        {currentPage + i - 1}
+                      </button>
+                    {/if}
+                  {/each}
+                  
+                  {#if currentPage < totalPages - 2}
+                    <span class="ellipsis">...</span>
+                  {/if}
+                  
+                  <button 
+                    on:click={() => goToPage(totalPages)}
+                    class="page-btn {currentPage === totalPages ? 'active' : ''}"
+                  >
+                    {totalPages}
+                  </button>
+                {/if}
+                
+                <button 
+                  on:click={nextPage} 
+                  disabled={currentPage === totalPages}
+                  class="page-btn"
+                >
+                  Next
+                </button>
+              </div>
+              
+              <div class="page-size-control">
+                <label for="page-size">Items per page:</label>
+                <select id="page-size" bind:value={itemsPerPage} on:change={() => currentPage = 1}>
+                  <option value={25}>25</option>
+                  <option value={50}>50</option>
+                  <option value={100}>100</option>
+                  <option value={200}>200</option>
+                </select>
+              </div>
+            </div>
           {/if}
         </div>
       {:else}
@@ -351,6 +500,48 @@
     top: 0;
   }
 
+  th.sortable {
+    cursor: pointer;
+    user-select: none;
+    transition: background-color 0.2s ease;
+  }
+
+  th.sortable:hover {
+    background: #e9ecef;
+  }
+
+  th.sortable.sorted {
+    background: #dee2e6;
+  }
+
+  .header-content {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .sort-indicator {
+    font-size: 0.8rem;
+    color: #666;
+    opacity: 0.7;
+    min-width: 12px;
+    text-align: center;
+  }
+
+  th.sortable.sorted .sort-indicator {
+    color: #333;
+    opacity: 1;
+  }
+
+  th.sortable:not(.sorted) .sort-indicator {
+    opacity: 0.4;
+  }
+
+  th.sortable:hover .sort-indicator {
+    opacity: 1;
+  }
+
   .table-note {
     padding: 0.5rem;
     background: #f8f9fa;
@@ -395,5 +586,95 @@
   :global(.plot-container svg) {
     max-width: 100%;
     height: auto;
+  }
+
+  /* Pagination Styles */
+  .pagination {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem;
+    background: #f8f9fa;
+    border-top: 1px solid #ddd;
+    flex-wrap: wrap;
+    gap: 1rem;
+  }
+
+  .pagination-info {
+    font-size: 0.9rem;
+    color: #666;
+  }
+
+  .pagination-controls {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+  }
+
+  .page-btn {
+    padding: 0.5rem 0.75rem;
+    border: 1px solid #ddd;
+    background: white;
+    color: #333;
+    cursor: pointer;
+    border-radius: 4px;
+    font-size: 0.9rem;
+    min-width: 40px;
+    transition: all 0.2s ease;
+  }
+
+  .page-btn:hover:not(:disabled) {
+    background: #f8f9fa;
+    border-color: #adb5bd;
+  }
+
+  .page-btn:disabled {
+    background: #f8f9fa;
+    color: #adb5bd;
+    cursor: not-allowed;
+  }
+
+  .page-btn.active {
+    background: #007bff;
+    color: white;
+    border-color: #007bff;
+  }
+
+  .page-btn.active:hover {
+    background: #0056b3;
+    border-color: #0056b3;
+  }
+
+  .ellipsis {
+    padding: 0.5rem;
+    color: #666;
+  }
+
+  .page-size-control {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.9rem;
+  }
+
+  .page-size-control label {
+    color: #666;
+  }
+
+  .page-size-control select {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.85rem;
+  }
+
+  @media (max-width: 768px) {
+    .pagination {
+      flex-direction: column;
+      align-items: stretch;
+      text-align: center;
+    }
+    
+    .pagination-controls {
+      justify-content: center;
+    }
   }
 </style>

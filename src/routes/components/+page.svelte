@@ -4,9 +4,11 @@
 	import { getTestData } from '$lib/data/data-loader';
 
 	let memeTestData = null;
+	let felTestData = null;
 
 	onMount(async () => {
 		memeTestData = await getTestData('meme');
+		felTestData = await getTestData('fel');
 	});
 	
 	// Demo data for FEL component
@@ -76,7 +78,11 @@
 			
 			<div class="demo-area">
 				<div class="fel-preview">
-					<FelVisualization data={felDemoData} />
+					{#if felTestData}
+						<FelVisualization data={felTestData} />
+					{:else}
+						<p>Loading FEL demo...</p>
+					{/if}
 				</div>
 			</div>
 

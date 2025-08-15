@@ -31,6 +31,7 @@ interface FelAttributes {
 export interface SiteData {
   partition: number;
   codon: number;
+  Site: number;
   alpha: number;
   beta: number;
   "alpha=beta": number;
@@ -122,17 +123,23 @@ export function getFelSiteTableData(resultsJson: FelResults, pvalueThreshold: nu
   const headers = _.clone(resultsJson.MLE.headers);
   const format: Record<string, (d: any) => any> = {};
 
-  format[headers[0][0]] = (d: number) => d.toFixed(3);
+  // Add site index as first column
+  headers.unshift(["Site", "Site/Codon index"]);
+  format["Site"] = (d: number) => d.toString();
+
   format[headers[1][0]] = (d: number) => d.toFixed(3);
   format[headers[2][0]] = (d: number) => d.toFixed(3);
   format[headers[3][0]] = (d: number) => d.toFixed(3);
-  format[headers[4][0]] = (d: number) => d <= pvalueThreshold ? `<b>${d.toFixed(4)}</b>` : d.toFixed(4);
+  format[headers[4][0]] = (d: number) => d.toFixed(3);
+  format[headers[5][0]] = (d: number) => d <= pvalueThreshold ? `<b>${d.toFixed(4)}</b>` : d.toFixed(4);
   
   if (felAttrs.hasPasmt) {
-    format[headers[headers.length-1][0]] = format[headers[4][0]];
+    format[headers[headers.length-1][0]] = format[headers[5][0]];
   }
   
-  format[headers[5][0]] = (d: number) => d.toFixed(3);
+  if (headers[6]) {
+    format[headers[6][0]] = (d: number) => d.toFixed(3);
+  }
   headers.push(["class", `Site classification at p<=${pvalueThreshold}`]); 
   format["class"] = (d: string) => `<span style="color:${COLORS[d as keyof typeof COLORS]}">${d}</span>`;
 
@@ -150,24 +157,26 @@ export function getFelSiteTableData(resultsJson: FelResults, pvalueThreshold: nu
         class: row[4] <= pvalueThreshold ? (row[0] < row[1] ? "Diversifying" : "Purifying") : (row[0] + row[1] ? "Neutral" : "Invariable")
       };
       
-      rowObject[headers[0][0]] = +row[0];
-      rowObject[headers[1][0]] = +row[1];
-      rowObject[headers[2][0]] = +row[2];
-      rowObject[headers[3][0]] = +row[3];
-      rowObject[headers[4][0]] = +row[4];
+      // Add site index as first column data
+      rowObject["Site"] = siteLookup[i] + 1;
+      rowObject[headers[1][0]] = +row[0];
+      rowObject[headers[2][0]] = +row[1];
+      rowObject[headers[3][0]] = +row[2];
+      rowObject[headers[4][0]] = +row[3];
+      rowObject[headers[5][0]] = +row[4];
       
       if (felAttrs.hasPositiveLRT) {
-        rowObject[headers[5][0]] = +row[5];
+        rowObject[headers[6][0]] = +row[5];
       }
       
       if (felAttrs.hasCi) {
-        rowObject[headers[6][0]] = row[6];
-        rowObject[headers[7][0]] = row[7];
-        rowObject[headers[8][0]] = row[8];
+        rowObject[headers[7][0]] = row[6];
+        rowObject[headers[8][0]] = row[7];
+        rowObject[headers[9][0]] = row[8];
       }
       
       if (felAttrs.hasPasmt) {
-        rowObject[headers[headers.length-2][0]] = row[headers.length-2];
+        rowObject[headers[headers.length-2][0]] = row[headers.length-3];
       }
       
       results.push(rowObject);
