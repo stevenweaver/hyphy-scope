@@ -1,9 +1,23 @@
 {
   "name": "hyphy-scope",
-  "version": "0.0.1",
+  "version": "1.0.0",
   "description": "Reusable Svelte components for HyPhy analysis visualization",
-  "author": "Your Name",
+  "author": "Steven Weaver",
   "license": "MIT",
+  "homepage": "https://github.com/stevenweaver/hyphy-scope",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/stevenweaver/hyphy-scope.git"
+  },
+  "keywords": [
+    "hyphy",
+    "phylogenetics",
+    "bioinformatics",
+    "svelte",
+    "visualization",
+    "components",
+    "selection-analysis"
+  ],
   "type": "module",
   "scripts": {
     "dev": "vite dev",
@@ -57,12 +71,5 @@
     "vite": "^5.0.11"
   },
   "svelte": "./dist/index.js",
-  "types": "./dist/index.d.ts",
-  "keywords": [
-    "svelte",
-    "components",
-    "hyphy",
-    "bioinformatics",
-    "visualization"
-  ]
+  "types": "./dist/index.d.ts"
 }
