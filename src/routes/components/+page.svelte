@@ -1,14 +1,16 @@
 <script>
 	import { onMount } from 'svelte';
-	import { HelloWorld, FelVisualization, MemeVisualization } from '$lib';
+	import { HelloWorld, FelVisualization, MemeVisualization, AbsrelVisualization } from '$lib';
 	import { getTestData } from '$lib/data/data-loader';
 
 	let memeTestData = null;
 	let felTestData = null;
+	let absrelTestData = null;
 
 	onMount(async () => {
 		memeTestData = await getTestData('meme');
 		felTestData = await getTestData('fel');
+		absrelTestData = await getTestData('absrel');
 	});
 	
 	// Demo data for FEL component
@@ -140,14 +142,47 @@
 			<p><a href="/meme">→ View full MEME demo</a></p>
 		</div>
 
+		<div class="component-item">
+			<h2>AbsrelVisualization</h2>
+			<p>Interactive visualization for Adaptive Branch-Site Random Effects Likelihood (aBSREL) analysis results from HyPhy.</p>
+			
+			<div class="demo-area">
+				<div class="absrel-preview">
+					{#if absrelTestData}
+						<AbsrelVisualization data={absrelTestData} />
+					{:else}
+						<p>Loading aBSREL demo...</p>
+					{/if}
+				</div>
+			</div>
+
+			<details>
+				<summary>Code Example</summary>
+				<pre><code>{@html `&lt;script&gt;
+	import { AbsrelVisualization } from 'hyphy-scope';
+	import { onMount } from 'svelte';
+	
+	let data = null;
+	
+	onMount(async () => {
+		data = await loadAbsrelData();
+	});
+&lt;/script&gt;
+
+&lt;AbsrelVisualization {data} /&gt;`}</code></pre>
+			</details>
+			
+			<p><a href="/absrel">→ View full aBSREL demo</a></p>
+		</div>
+
 		<div class="placeholder">
 			<h2>More Components Coming Soon</h2>
 			<p>This is where we'll showcase:</p>
 			<ul>
 				<li>Phylogenetic tree visualizations</li>
-				<li>Selection analysis charts</li>
-				<li>Data tables for results</li>
-				<li>Interactive plots</li>
+				<li>BUSTED analysis results</li>
+				<li>RELAX analysis results</li>
+				<li>Additional HyPhy methods</li>
 			</ul>
 		</div>
 	</div>
@@ -212,7 +247,7 @@
 		margin-top: 0.5rem;
 	}
 
-	.fel-preview, .meme-preview {
+	.fel-preview, .meme-preview, .absrel-preview {
 		max-height: 400px;
 		overflow-y: auto;
 		border: 1px solid #ddd;
