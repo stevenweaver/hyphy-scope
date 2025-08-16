@@ -19,108 +19,67 @@
   export let showColumns: string[] = ["Diversifying", "Purifying", "Neutral", "Invariable"];
   export let plotType: string = "alpha/beta site-level estimates";
 
+  // Core state
   let attributes: any = {};
   let sitesTable: [SiteData[], any[], any] = [[], [], {}];
-  let filteredSiteData: SiteData[] = [];
   let tileSpecs: any[] = [];
   let plotDescription: string = "";
   let availablePlotTypes: string[] = [];
   let plotContainer: HTMLElement;
   
-  // Pagination variables
+  // Pagination
   let currentPage = 1;
   let itemsPerPage = 50;
   
-  // Sorting variables
+  // Sorting
   let sortColumn = "Site";
   let sortDirection: "asc" | "desc" = "asc";
+  
+  // Computed data - we'll calculate these explicitly
+  let allSiteData: SiteData[] = [];
+  let filteredSiteData: SiteData[] = [];
+  let sortedData: SiteData[] = [];
+  let paginatedData: SiteData[] = [];
+  let totalPages = 0;
   
   // Helper function for color lookup
   function getColorForClass(className: string): string {
     return COLORS[className as keyof typeof COLORS] || '#000000';
   }
   
-  
-  $: sortedData = [...filteredSiteData].sort((a, b) => {
-    const aVal = a[sortColumn];
-    const bVal = b[sortColumn];
+  // Update all computed values
+  function updateComputedData() {
     
-    // Handle numeric values
-    if (typeof aVal === 'number' && typeof bVal === 'number') {
-      return sortDirection === "asc" ? aVal - bVal : bVal - aVal;
-    }
+    // Get all site data
+    allSiteData = sitesTable[0] || [];
     
-    // Handle string values
-    const aStr = String(aVal).toLowerCase();
-    const bStr = String(bVal).toLowerCase();
+    // Filter by selected columns
+    filteredSiteData = allSiteData.filter(x => showColumns.includes(x.class));
     
-    if (sortDirection === "asc") {
-      return aStr < bStr ? -1 : aStr > bStr ? 1 : 0;
-    } else {
-      return aStr > bStr ? -1 : aStr < bStr ? 1 : 0;
-    }
-  });
-  
-  $: totalPages = Math.ceil(sortedData.length / itemsPerPage);
-  $: paginatedData = sortedData.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
-  
-  function goToPage(page: number) {
-    currentPage = Math.max(1, Math.min(page, totalPages));
-  }
-  
-  function nextPage() {
-    if (currentPage < totalPages) currentPage++;
-  }
-  
-  function prevPage() {
-    if (currentPage > 1) currentPage--;
-  }
-  
-  function handleSort(column: string) {
-    if (sortColumn === column) {
-      // Toggle direction if same column
-      sortDirection = sortDirection === "asc" ? "desc" : "asc";
-    } else {
-      // New column, default to ascending
-      sortColumn = column;
-      sortDirection = "asc";
-    }
-    // Reset to first page when sorting changes
-    currentPage = 1;
-  }
-  
-  // Ensure initial render
-  onMount(async () => {
-    await tick();
-    if (data) {
-      await processData();
-    }
-  });
-
-  // Main data processing reactive statement
-  $: if (data && pvalueThreshold !== undefined) {
-    processData();
-  }
-
-  // Filter data when sitesTable or showColumns change
-  $: {
-    if (sitesTable && sitesTable[0] && sitesTable[0].length > 0 && showColumns && showColumns.length > 0) {
-      const newFilteredData = sitesTable[0].filter(x => showColumns.includes(x.class));
-      if (newFilteredData.length !== filteredSiteData.length || 
-          !newFilteredData.every((item, index) => item === filteredSiteData[index])) {
-        filteredSiteData = newFilteredData;
-        currentPage = 1;
+    // Sort the filtered data
+    sortedData = [...filteredSiteData].sort((a, b) => {
+      const aVal = a[sortColumn];
+      const bVal = b[sortColumn];
+      
+      if (typeof aVal === 'number' && typeof bVal === 'number') {
+        return sortDirection === "asc" ? aVal - bVal : bVal - aVal;
       }
-    }
+      
+      const aStr = String(aVal).toLowerCase();
+      const bStr = String(bVal).toLowerCase();
+      return sortDirection === "asc" ? aStr.localeCompare(bStr) : bStr.localeCompare(aStr);
+    });
+    
+    // Calculate pagination
+    totalPages = Math.ceil(sortedData.length / itemsPerPage);
+    paginatedData = sortedData.slice(
+      (currentPage - 1) * itemsPerPage,
+      currentPage * itemsPerPage
+    );
+    
   }
-
-  // Update plot when ready
-  $: {
-    if (plotType && filteredSiteData && filteredSiteData.length > 0 && plotContainer) {
-      updatePlot();
-    }
-  }
-
+  
+  // Process the main data
   async function processData() {
     if (!data?.MLE) return;
 
@@ -137,16 +96,20 @@
       plotType = availablePlotTypes[0];
     }
     
-    // Force reactive updates
+    // Update computed data
+    updateComputedData();
+    
+    // Force UI update
     await tick();
     
-    // Trigger initial filtering if not already done
-    if (filteredSiteData.length === 0 && sitesTable[0].length > 0 && showColumns.length > 0) {
-      filteredSiteData = sitesTable[0].filter(x => showColumns.includes(x.class));
+    // Update plot if container is ready
+    if (plotContainer) {
+      updatePlot();
     }
   }
-
+  
   function updatePlot() {
+    
     if (!data || !plotType || filteredSiteData.length === 0 || !plotContainer) return;
     
     plotDescription = getFelPlotDescription(plotType, pvalueThreshold);
@@ -164,61 +127,104 @@
       plotContainer.innerHTML = '<p class="error">Error rendering plot</p>';
     }
   }
+  
+  // Pagination functions
+  function goToPage(page: number) {
+    currentPage = Math.max(1, Math.min(page, totalPages));
+    updateComputedData();
+  }
+  
+  function nextPage() {
+    if (currentPage < totalPages) {
+      currentPage++;
+      updateComputedData();
+    }
+  }
+  
+  function prevPage() {
+    if (currentPage > 1) {
+      currentPage--;
+      updateComputedData();
+    }
+  }
+  
+  function handleSort(column: string) {
+    if (sortColumn === column) {
+      sortDirection = sortDirection === "asc" ? "desc" : "asc";
+    } else {
+      sortColumn = column;
+      sortDirection = "asc";
+    }
+    currentPage = 1;
+    updateComputedData();
+  }
+  
+  // Initialize on mount
+  onMount(async () => {
+    await tick();
+    if (data) {
+      await processData();
+    }
+  });
+  
+  // Reactive updates
+  $: if (data && pvalueThreshold !== undefined) {
+    processData();
+  }
+  
+  $: if (showColumns && sitesTable[0]?.length > 0) {
+    updateComputedData();
+    updatePlot();
+  }
+  
+  $: if (plotType && filteredSiteData.length > 0 && plotContainer) {
+    updatePlot();
+  }
 
   function formatValue(value: any, formatter: (v: any) => any): string {
-    if (typeof formatter === 'function') {
-      const result = formatter(value);
-      return typeof result === 'string' ? result : String(result);
-    }
-    return String(value);
+    return formatter ? formatter(value) : String(value);
   }
 </script>
 
 <div class="fel-visualization">
   {#if !data}
-    <div class="loading">
-      <p>Loading FEL data...</p>
-    </div>
+    <div class="loading">Loading FEL data...</div>
   {:else}
-    <!-- Summary tiles -->
-    <div class="summary-tiles">
-      {#each tileSpecs as tile}
-        <div class="tile" style="border-left: 4px solid var(--color-{tile.color}, #ccc)">
-          <div class="tile-number">{tile.number}</div>
-          <div class="tile-description">{tile.description}</div>
-        </div>
-      {/each}
-    </div>
-
-    <!-- Analysis description -->
-    <div class="analysis-info">
-      <p>
-        Statistical significance is evaluated based on 
-        {#if data.simulated}
-          <code>{data.simulated}</code> site-level parametric bootstrap replicates
-        {:else}
-          the asymptotic chi-squared distribution
-        {/if}.
-        This analysis <strong>{attributes.hasBackground ? 'included' : 'does not include'}</strong> 
-        site to site synonymous rate variation.
-        {#if attributes.hasCi}
-          Profile approximate confidence intervals for site-level dN/dS ratios have been computed.
-        {/if}
-      </p>
-    </div>
+    <!-- Summary Tiles -->
+    {#if tileSpecs.length > 0}
+      <div class="summary-tiles">
+        {#each tileSpecs as tile}
+          <div class="tile">
+            <div class="tile-number" style="color: {tile.color || '#333'}">
+              {tile.value}
+            </div>
+            <div class="tile-description">{tile.description}</div>
+          </div>
+        {/each}
+      </div>
+    {/if}
 
     <!-- Controls -->
-    <div class="controls">
+    <div class="controls-section">
       <div class="control-group">
         <label for="pvalue-threshold">p-value threshold:</label>
         <input 
           id="pvalue-threshold"
           type="number" 
-          step="0.01" 
+          bind:value={pvalueThreshold} 
           min="0" 
           max="1" 
-          bind:value={pvalueThreshold}
+          step="0.01"
         />
+      </div>
+
+      <div class="control-group">
+        <label for="plot-select">Plot type:</label>
+        <select id="plot-select" bind:value={plotType}>
+          {#each availablePlotTypes as type}
+            <option value={type}>{type}</option>
+          {/each}
+        </select>
       </div>
 
       <div class="control-group">
@@ -236,28 +242,18 @@
           {/each}
         </div>
       </div>
-
-      <div class="control-group">
-        <label for="plot-type">Plot type:</label>
-        <select id="plot-type" bind:value={plotType}>
-          {#each availablePlotTypes as type}
-            <option value={type}>{type}</option>
-          {/each}
-        </select>
-      </div>
     </div>
 
-    <!-- Plot -->
-    {#if filteredSiteData.length > 0}
-      <div class="plot-section">
-        <h3>Figure 1</h3>
-        <p class="plot-description">{plotDescription}</p>
-        <div 
-          class="plot-container"
-          bind:this={plotContainer}
-        ></div>
-      </div>
-    {/if}
+    <!-- Plot section -->
+    <div class="plot-section">
+      <h3>Figure 1</h3>
+      <p class="plot-description">{plotDescription}</p>
+      <div 
+        class="plot-container" 
+        bind:this={plotContainer}
+      ></div>
+    </div>
+
 
     <!-- Results table -->
     <div class="table-section">
@@ -370,28 +366,21 @@
                   Next
                 </button>
               </div>
-              
-              <div class="page-size-control">
-                <label for="page-size">Items per page:</label>
-                <select id="page-size" bind:value={itemsPerPage} on:change={() => currentPage = 1}>
-                  <option value={25}>25</option>
-                  <option value={50}>50</option>
-                  <option value={100}>100</option>
-                  <option value={200}>200</option>
-                </select>
-              </div>
             </div>
           {/if}
         </div>
       {:else}
-        <p>No data to display with current filters.</p>
+        <p class="no-data">No sites match the current filter criteria.</p>
       {/if}
     </div>
 
     <!-- Citation -->
     <div class="citation">
-      <h3>Suggested Citation</h3>
-      <p><code>{data.analysis.citation}</code></p>
+      <h3>Citation</h3>
+      <code>
+        Kosakovsky Pond SL, Frost SDW. Not so different after all: a comparison of methods for detecting amino acid sites under selection. 
+        Mol Biol Evol. 2005;22(5):1208-22. doi:10.1093/molbev/msi105
+      </code>
     </div>
   {/if}
 </div>
@@ -412,16 +401,17 @@
 
   .summary-tiles {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
     gap: 1rem;
     margin-bottom: 2rem;
   }
 
   .tile {
-    background: white;
+    background: #fff;
     padding: 1rem;
     border-radius: 4px;
     box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    text-align: center;
   }
 
   .tile-number {
@@ -436,32 +426,32 @@
     margin-top: 0.5rem;
   }
 
-  .analysis-info {
+  .controls-section {
     background: #f8f9fa;
     padding: 1rem;
     border-radius: 4px;
     margin-bottom: 2rem;
-  }
-
-  .controls {
     display: flex;
     flex-wrap: wrap;
-    gap: 2rem;
-    margin-bottom: 2rem;
-    padding: 1rem;
-    background: #f8f9fa;
-    border-radius: 4px;
+    gap: 1rem;
   }
 
   .control-group {
     display: flex;
-    flex-direction: column;
+    align-items: center;
     gap: 0.5rem;
   }
 
   .control-group label {
     font-weight: 500;
     color: #333;
+  }
+
+  .control-group input[type="number"],
+  .control-group select {
+    padding: 0.25rem 0.5rem;
+    border: 1px solid #ddd;
+    border-radius: 3px;
   }
 
   .checkbox-group {
@@ -473,34 +463,44 @@
   .checkbox-label {
     display: flex;
     align-items: center;
-    gap: 0.5rem;
-    padding: 0.25rem 0.5rem;
-    margin-bottom: -2px;
-    text-transform: capitalize;
+    gap: 0.25rem;
+    cursor: pointer;
+    padding-bottom: 2px;
   }
 
-  .plot-section, .table-section {
+  .plot-section {
     margin-bottom: 2rem;
   }
 
-  .plot-description, .table-description {
-    font-size: 0.9rem;
-    color: #666;
+  .plot-section h3 {
+    margin-bottom: 0.5rem;
+    color: #333;
+  }
+
+  .plot-description {
     margin-bottom: 1rem;
+    color: #666;
+    font-style: italic;
   }
 
   .plot-container {
-    min-height: 300px;
+    min-height: 400px;
     border: 1px solid #ddd;
     border-radius: 4px;
     padding: 1rem;
+    background: #fff;
     overflow-x: auto;
   }
 
+  .table-section {
+    margin-bottom: 2rem;
+  }
+
   .table-container {
-    overflow-x: auto;
-    border: 1px solid #ddd;
+    background: #fff;
     border-radius: 4px;
+    overflow: hidden;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
   }
 
   table {
@@ -508,74 +508,110 @@
     border-collapse: collapse;
   }
 
-  th, td {
-    padding: 0.5rem;
-    text-align: left;
-    border-bottom: 1px solid #eee;
-    font-size: 0.9rem;
+  thead {
+    background: #f8f9fa;
   }
 
   th {
-    background: #f8f9fa;
-    font-weight: 500;
-    position: sticky;
-    top: 0;
+    padding: 0.75rem;
+    text-align: left;
+    font-weight: 600;
+    color: #333;
+    border-bottom: 2px solid #dee2e6;
   }
 
   th.sortable {
     cursor: pointer;
     user-select: none;
-    transition: background-color 0.2s ease;
   }
 
   th.sortable:hover {
     background: #e9ecef;
   }
 
-  th.sortable.sorted {
-    background: #dee2e6;
+  th.sorted {
+    background: #e3f2fd;
   }
 
   .header-content {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    gap: 0.5rem;
   }
 
   .sort-indicator {
-    font-size: 0.8rem;
-    color: #666;
-    opacity: 0.7;
-    min-width: 12px;
-    text-align: center;
+    color: #6c757d;
+    font-size: 0.875rem;
   }
 
-  th.sortable.sorted .sort-indicator {
-    color: #333;
-    opacity: 1;
+  td {
+    padding: 0.5rem 0.75rem;
+    border-bottom: 1px solid #dee2e6;
   }
 
-  th.sortable:not(.sorted) .sort-indicator {
-    opacity: 0.4;
-  }
-
-  th.sortable:hover .sort-indicator {
-    opacity: 1;
-  }
-
-  .table-note {
-    padding: 0.5rem;
+  tbody tr:hover {
     background: #f8f9fa;
-    font-size: 0.8rem;
-    color: #666;
-    margin: 0;
+  }
+
+  .pagination {
+    padding: 1rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-top: 1px solid #dee2e6;
+  }
+
+  .pagination-info {
+    color: #6c757d;
+    font-size: 0.875rem;
+  }
+
+  .pagination-controls {
+    display: flex;
+    gap: 0.25rem;
+    align-items: center;
+  }
+
+  .page-btn {
+    padding: 0.25rem 0.5rem;
+    border: 1px solid #dee2e6;
+    background: #fff;
+    color: #333;
+    cursor: pointer;
+    border-radius: 3px;
+    font-size: 0.875rem;
+  }
+
+  .page-btn:hover:not(:disabled) {
+    background: #e9ecef;
+  }
+
+  .page-btn:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+  }
+
+  .page-btn.active {
+    background: #007bff;
+    color: #fff;
+    border-color: #007bff;
+  }
+
+  .ellipsis {
+    padding: 0 0.5rem;
+    color: #6c757d;
+  }
+
+  .no-data {
+    text-align: center;
+    padding: 2rem;
+    color: #6c757d;
   }
 
   .citation {
     margin-top: 2rem;
     padding-top: 2rem;
-    border-top: 1px solid #ddd;
+    border-top: 1px solid #dee2e6;
   }
 
   .citation code {
@@ -590,113 +626,6 @@
   .error {
     color: #e74c3c;
     text-align: center;
-    padding: 1rem;
-  }
-
-  h3 {
-    margin: 0 0 1rem 0;
-    color: #333;
-  }
-
-  input[type="number"], select {
-    padding: 0.5rem;
-    border: 1px solid #ddd;
-    border-radius: 4px;
-    font-size: 0.9rem;
-  }
-
-  :global(.plot-container svg) {
-    max-width: 100%;
-    height: auto;
-  }
-
-  /* Pagination Styles */
-  .pagination {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 1rem;
-    background: #f8f9fa;
-    border-top: 1px solid #ddd;
-    flex-wrap: wrap;
-    gap: 1rem;
-  }
-
-  .pagination-info {
-    font-size: 0.9rem;
-    color: #666;
-  }
-
-  .pagination-controls {
-    display: flex;
-    align-items: center;
-    gap: 0.25rem;
-  }
-
-  .page-btn {
-    padding: 0.5rem 0.75rem;
-    border: 1px solid #ddd;
-    background: white;
-    color: #333;
-    cursor: pointer;
-    border-radius: 4px;
-    font-size: 0.9rem;
-    min-width: 40px;
-    transition: all 0.2s ease;
-  }
-
-  .page-btn:hover:not(:disabled) {
-    background: #f8f9fa;
-    border-color: #adb5bd;
-  }
-
-  .page-btn:disabled {
-    background: #f8f9fa;
-    color: #adb5bd;
-    cursor: not-allowed;
-  }
-
-  .page-btn.active {
-    background: #007bff;
-    color: white;
-    border-color: #007bff;
-  }
-
-  .page-btn.active:hover {
-    background: #0056b3;
-    border-color: #0056b3;
-  }
-
-  .ellipsis {
-    padding: 0.5rem;
-    color: #666;
-  }
-
-  .page-size-control {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    font-size: 0.9rem;
-  }
-
-  .page-size-control label {
-    color: #666;
-  }
-
-  .page-size-control select {
-    padding: 0.25rem 0.5rem;
-    font-size: 0.85rem;
-  }
-
-  @media (max-width: 768px) {
-    .pagination {
-      flex-direction: column;
-      align-items: stretch;
-      text-align: center;
-    }
-    
-    .pagination-controls {
-      justify-content: center;
-    }
+    padding: 2rem;
   }
 </style>
