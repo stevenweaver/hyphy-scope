@@ -30,6 +30,7 @@
   let plotContainer: HTMLElement;
   let countSites: number = 0;
   let bsPositiveSelection: any[] = [];
+  let dataProcessed = false;
 
   // Computed data - we'll calculate these explicitly
   let allSiteData: MemeSiteData[] = [];
@@ -76,6 +77,9 @@
     
     // Update computed data
     updateComputedData();
+    
+    // Mark data as processed
+    dataProcessed = true;
     
     // Force UI update
     await tick();
