@@ -109,12 +109,14 @@
   onMount(async () => {
     await tick();
     if (data) {
+      dataProcessed = false;
       await processData();
     }
   });
 
   // Reactive updates
   $: if (data && pvalueThreshold !== undefined) {
+    dataProcessed = false;
     processData();
   }
 
@@ -137,7 +139,7 @@
     <div class="loading">Loading MEME data...</div>
   {:else}
     <!-- Summary Tiles -->
-    {#if tileSpecs.length > 0}
+    {#if dataProcessed && tileSpecs.length > 0}
       <div class="summary-tiles">
         {#each tileSpecs as tile}
           <div class="tile">

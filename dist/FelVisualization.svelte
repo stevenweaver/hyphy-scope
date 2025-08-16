@@ -26,6 +26,7 @@
   let plotDescription: string = "";
   let availablePlotTypes: string[] = [];
   let plotContainer: HTMLElement;
+  let dataProcessed = false;
   
   // Pagination
   let currentPage = 1;
@@ -99,6 +100,9 @@
     // Update computed data
     updateComputedData();
     
+    // Mark data as processed
+    dataProcessed = true;
+    
     // Force UI update
     await tick();
     
@@ -163,12 +167,14 @@
   onMount(async () => {
     await tick();
     if (data) {
+      dataProcessed = false;
       await processData();
     }
   });
   
   // Reactive updates
   $: if (data && pvalueThreshold !== undefined) {
+    dataProcessed = false;
     processData();
   }
   
@@ -191,7 +197,7 @@
     <div class="loading">Loading FEL data...</div>
   {:else}
     <!-- Summary Tiles -->
-    {#if tileSpecs.length > 0}
+    {#if dataProcessed && tileSpecs.length > 0}
       <div class="summary-tiles">
         {#each tileSpecs as tile}
           <div class="tile">
