@@ -53,13 +53,14 @@
     });
   }
 
+  // Initialize plots when data is available and component is mounted
+  let mounted = false;
+  
   onMount(() => {
-    if (correlationData.length > 0) {
-      renderPlots();
-    }
+    mounted = true;
   });
 
-  $: if (correlationData.length > 0) {
+  $: if (mounted && correlationData.length > 0) {
     renderPlots();
   }
 

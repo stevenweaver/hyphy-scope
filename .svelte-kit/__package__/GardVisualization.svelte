@@ -58,13 +58,14 @@
     });
   }
 
+  // Initialize plots when data is available and component is mounted
+  let mounted = false;
+  
   onMount(() => {
-    if (breakpointData.length > 0) {
-      renderPlots();
-    }
+    mounted = true;
   });
 
-  $: if (breakpointData.length > 0) {
+  $: if (mounted && breakpointData.length > 0) {
     renderPlots();
   }
 

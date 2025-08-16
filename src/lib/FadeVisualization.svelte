@@ -61,13 +61,14 @@
     });
   }
 
+  // Initialize plots when data is available and component is mounted
+  let mounted = false;
+  
   onMount(() => {
-    if (biasData.length > 0) {
-      renderPlots();
-    }
+    mounted = true;
   });
 
-  $: if (biasData.length > 0) {
+  $: if (mounted && biasData.length > 0) {
     renderPlots();
   }
 

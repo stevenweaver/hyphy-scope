@@ -68,14 +68,14 @@
   let siteLogLikePlotContainer: HTMLDivElement;
   let modelComparisonPlotContainer: HTMLDivElement;
 
-  // Initialize plots
+  // Initialize plots when data is available and component is mounted
+  let mounted = false;
+  
   onMount(() => {
-    if (testedBranches.length > 0) {
-      renderPlots();
-    }
+    mounted = true;
   });
 
-  $: if (testedBranches.length > 0) {
+  $: if (mounted && testedBranches.length > 0) {
     renderPlots();
   }
 

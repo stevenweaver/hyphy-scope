@@ -288,14 +288,14 @@
     });
   }
 
-  // Initialize plots
+  // Initialize plots when data is available and component is mounted
+  let mounted = false;
+  
   onMount(() => {
-    if (summary) {
-      renderPlots();
-    }
+    mounted = true;
   });
 
-  $: if (summary) {
+  $: if (mounted && summary) {
     renderPlots();
   }
 

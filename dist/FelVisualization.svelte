@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
+  import { onMount, tick } from 'svelte';
   import * as _ from 'lodash-es';
   import { 
     getFelAttributes, 
@@ -39,6 +39,7 @@
   function getColorForClass(className: string): string {
     return COLORS[className as keyof typeof COLORS] || '#000000';
   }
+  
   
   $: sortedData = [...filteredSiteData].sort((a, b) => {
     const aVal = a[sortColumn];
@@ -87,29 +88,40 @@
     // Reset to first page when sorting changes
     currentPage = 1;
   }
+  
+  // Ensure initial render
+  onMount(async () => {
+    await tick();
+    if (data) {
+      await processData();
+    }
+  });
 
-  $: if (data) {
+  // Main data processing reactive statement
+  $: if (data && pvalueThreshold !== undefined) {
     processData();
   }
 
-  $: if (sitesTable[0].length > 0 && showColumns) {
-    const inSet = new Set(filteredSiteData.map(d => d.codon));
-    filteredSiteData = sitesTable[0].filter(x => 
-      showColumns.includes(x.class) && (!filteredSiteData.length || inSet.has(x.codon))
-    );
-    currentPage = 1; // Reset to first page when filters change
-    updatePlot();
+  // Filter data when sitesTable or showColumns change
+  $: {
+    if (sitesTable && sitesTable[0] && sitesTable[0].length > 0 && showColumns && showColumns.length > 0) {
+      const newFilteredData = sitesTable[0].filter(x => showColumns.includes(x.class));
+      if (newFilteredData.length !== filteredSiteData.length || 
+          !newFilteredData.every((item, index) => item === filteredSiteData[index])) {
+        filteredSiteData = newFilteredData;
+        currentPage = 1;
+      }
+    }
   }
 
-  $: if (pvalueThreshold !== undefined) {
-    processData();
+  // Update plot when ready
+  $: {
+    if (plotType && filteredSiteData && filteredSiteData.length > 0 && plotContainer) {
+      updatePlot();
+    }
   }
 
-  $: if (plotType && filteredSiteData.length > 0) {
-    updatePlot();
-  }
-
-  function processData() {
+  async function processData() {
     if (!data?.MLE) return;
 
     attributes = getFelAttributes(data);
@@ -124,9 +136,14 @@
     if (!availablePlotTypes.includes(plotType) && availablePlotTypes.length > 0) {
       plotType = availablePlotTypes[0];
     }
-
-    filteredSiteData = sitesTable[0].filter(x => showColumns.includes(x.class));
-    updatePlot();
+    
+    // Force reactive updates
+    await tick();
+    
+    // Trigger initial filtering if not already done
+    if (filteredSiteData.length === 0 && sitesTable[0].length > 0 && showColumns.length > 0) {
+      filteredSiteData = sitesTable[0].filter(x => showColumns.includes(x.class));
+    }
   }
 
   function updatePlot() {
@@ -273,7 +290,7 @@
               </tr>
             </thead>
             <tbody>
-              {#each paginatedData as row}
+              {#each paginatedData as row (row.codon)}
                 <tr>
                   {#each sitesTable[1] as [key]}
                     <td>

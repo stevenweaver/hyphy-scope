@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { onMount, tick } from 'svelte';
   import * as _ from 'lodash-es';
   import { 
     getMemeAttributes, 
@@ -20,9 +21,9 @@
   export let showColumns: string[] = ["Diversifying", "Neutral", "Invariable"];
   export let plotType: string = "p-values for selection";
 
+  // Core state
   let attributes: any = {};
   let sitesTable: [MemeSiteData[], any[], any] = [[], [], {}];
-  let filteredSiteData: MemeSiteData[] = [];
   let tileSpecs: any[] = [];
   let plotDescription: string = "";
   let availablePlotTypes: string[] = [];
@@ -30,29 +31,26 @@
   let countSites: number = 0;
   let bsPositiveSelection: any[] = [];
 
+  // Computed data - we'll calculate these explicitly
+  let allSiteData: MemeSiteData[] = [];
+  let filteredSiteData: MemeSiteData[] = [];
+
   // Helper function for color lookup
   function getMemeColorForClass(className: string): string {
     return MEME_COLORS[className as keyof typeof MEME_COLORS] || '#000000';
   }
 
-  $: if (data) {
-    processData();
+  // Update all computed values
+  function updateComputedData() {
+    // Get all site data
+    allSiteData = sitesTable[0] || [];
+    
+    // Filter by selected columns
+    filteredSiteData = allSiteData.filter(x => showColumns.includes(x.class));
   }
 
-  $: if (sitesTable[0].length > 0 && showColumns) {
-    filteredSiteData = sitesTable[0].filter(x => showColumns.includes(x.class));
-    updatePlot();
-  }
-
-  $: if (pvalueThreshold !== undefined) {
-    processData();
-  }
-
-  $: if (plotType && filteredSiteData.length > 0) {
-    updatePlot();
-  }
-
-  function processData() {
+  // Process the main data
+  async function processData() {
     if (!data?.MLE) return;
 
     attributes = getMemeAttributes(data);
@@ -75,9 +73,17 @@
     if (!availablePlotTypes.includes(plotType) && availablePlotTypes.length > 0) {
       plotType = availablePlotTypes[0];
     }
-
-    filteredSiteData = sitesTable[0].filter(x => showColumns.includes(x.class));
-    updatePlot();
+    
+    // Update computed data
+    updateComputedData();
+    
+    // Force UI update
+    await tick();
+    
+    // Update plot if container is ready
+    if (plotContainer) {
+      updatePlot();
+    }
   }
 
   function updatePlot() {
@@ -99,58 +105,72 @@
     }
   }
 
-  function formatValue(value: any): string {
-    if (typeof value === 'number') {
-      return value.toFixed(4);
+  // Initialize on mount
+  onMount(async () => {
+    await tick();
+    if (data) {
+      await processData();
     }
-    return String(value);
+  });
+
+  // Reactive updates
+  $: if (data && pvalueThreshold !== undefined) {
+    processData();
+  }
+
+  $: if (showColumns && sitesTable[0]?.length > 0) {
+    updateComputedData();
+    updatePlot();
+  }
+
+  $: if (plotType && filteredSiteData.length > 0 && plotContainer) {
+    updatePlot();
+  }
+
+  function formatValue(value: any, formatter: (v: any) => any): string {
+    return formatter ? formatter(value) : String(value);
   }
 </script>
 
 <div class="meme-visualization">
   {#if !data}
-    <div class="loading">
-      <p>Loading MEME data...</p>
-    </div>
+    <div class="loading">Loading MEME data...</div>
   {:else}
-    <h2>MEME Results Summary</h2>
-    
-    <!-- Summary description -->
-    <div class="analysis-info">
-      <p>
-        Based on the likelihood ratio test, <strong>episodic diversifying selection</strong> has acted on 
-        <strong>{countSites}</strong> sites in this dataset (p≤{pvalueThreshold}).
-        {#if attributes.hasResamples > 0}
-          This analysis used parametric bootstrap with {attributes.hasResamples} replicates to test for significance.
-        {/if}
-        {#if +data.analysis.version < 3.0}
-          <small><strong>Some of the visualizations are not available for MEME analyses before v3.0</strong></small>
-        {/if}
-      </p>
-    </div>
-
-    <!-- Summary tiles -->
-    <div class="summary-tiles">
-      {#each tileSpecs as tile}
-        <div class="tile" style="border-left: 4px solid var(--color-{tile.color}, #ccc)">
-          <div class="tile-number">{tile.number}</div>
-          <div class="tile-description">{tile.description}</div>
-        </div>
-      {/each}
-    </div>
+    <!-- Summary Tiles -->
+    {#if tileSpecs.length > 0}
+      <div class="summary-tiles">
+        {#each tileSpecs as tile}
+          <div class="tile">
+            <div class="tile-number" style="color: {tile.color || '#333'}">
+              {tile.value}
+            </div>
+            <div class="tile-description">{tile.description}</div>
+          </div>
+        {/each}
+      </div>
+    {/if}
 
     <!-- Controls -->
-    <div class="controls">
+    <div class="controls-section">
       <div class="control-group">
         <label for="pvalue-threshold">p-value threshold:</label>
         <input 
           id="pvalue-threshold"
           type="number" 
-          step="0.01" 
+          bind:value={pvalueThreshold} 
           min="0" 
           max="1" 
-          bind:value={pvalueThreshold}
+          step="0.01"
         />
+      </div>
+
+      <div class="control-group">
+        <label for="plot-select">Plot type:</label>
+        <select id="plot-select" bind:value={plotType}>
+          {#each availablePlotTypes as type}
+            <option value={type}>{type}</option>
+          {/each}
+        </select>
       </div>
 
       <div class="control-group">
@@ -168,84 +188,61 @@
           {/each}
         </div>
       </div>
-
-      <div class="control-group">
-        <label for="plot-type">Plot type:</label>
-        <select id="plot-type" bind:value={plotType}>
-          {#each availablePlotTypes as type}
-            <option value={type}>{type}</option>
-          {/each}
-        </select>
-      </div>
     </div>
 
-    <!-- Plot -->
-    {#if filteredSiteData.length > 0}
-      <div class="plot-section">
-        <h3>Figure 1</h3>
-        <p class="plot-description">{plotDescription}</p>
-        <div 
-          class="plot-container"
-          bind:this={plotContainer}
-        ></div>
-      </div>
-    {/if}
+    <!-- Plot section -->
+    <div class="plot-section">
+      <h3>Figure 1</h3>
+      <p class="plot-description">{plotDescription}</p>
+      <div 
+        class="plot-container" 
+        bind:this={plotContainer}
+      ></div>
+    </div>
 
     <!-- Results table -->
     <div class="table-section">
       <h3>Table 1</h3>
-      <p class="table-description">Detailed site-by-site results from the MEME analysis</p>
+      <p class="table-description">
+        {countSites} sites found to be under positive selection at p ≤ {pvalueThreshold}
+      </p>
       
       {#if filteredSiteData.length > 0}
         <div class="table-container">
           <table>
             <thead>
               <tr>
-                <th>Partition</th>
-                <th>Codon</th>
-                <th>α</th>
-                <th>β-</th>
-                <th>p-</th>
-                <th>β+</th>
-                <th>p+</th>
-                <th>p-value</th>
-                <th>Branches</th>
-                <th>Class</th>
+                {#each sitesTable[1] as [key, description]}
+                  <th title={description}>{key}</th>
+                {/each}
               </tr>
             </thead>
             <tbody>
-              {#each filteredSiteData.slice(0, 50) as row}
+              {#each filteredSiteData as row}
                 <tr>
-                  <td>{row.Partition}</td>
-                  <td>{row.Codon}</td>
-                  <td>{formatValue(row.alpha)}</td>
-                  <td>{formatValue(row["beta-"])}</td>
-                  <td>{formatValue(row["p-"])}</td>
-                  <td>{formatValue(row["beta+"])}</td>
-                  <td>{formatValue(row["p+"])}</td>
-                  <td style="font-weight: {row['p-value'] <= pvalueThreshold ? 'bold' : 'normal'}">
-                    {formatValue(row["p-value"])}
-                  </td>
-                  <td>{row.Branches}</td>
-                  <td style="color: {MEME_COLORS[row.class]}">{row.class}</td>
+                  {#each sitesTable[1] as [key]}
+                    <td>
+                      {@html formatValue(row[key], sitesTable[2][key])}
+                    </td>
+                  {/each}
                 </tr>
               {/each}
             </tbody>
           </table>
-          
-          {#if filteredSiteData.length > 50}
-            <p class="table-note">Showing first 50 of {filteredSiteData.length} results</p>
-          {/if}
         </div>
       {:else}
-        <p>No data to display with current filters.</p>
+        <p class="no-data">No sites match the current filter criteria.</p>
       {/if}
     </div>
 
     <!-- Citation -->
     <div class="citation">
-      <h3>Suggested Citation</h3>
-      <p><code>{data.analysis.citation}</code></p>
+      <h3>Citation</h3>
+      <code>
+        Murrell B, Wertheim JO, Moola S, Weighill T, Scheffler K, Kosakovsky Pond SL. 
+        Detecting individual sites subject to episodic diversifying selection. 
+        PLoS Genet. 2012;8(7):e1002764. doi:10.1371/journal.pgen.1002764
+      </code>
     </div>
   {/if}
 </div>
@@ -264,26 +261,19 @@
     color: #666;
   }
 
-  .analysis-info {
-    background: #f8f9fa;
-    padding: 1.5rem;
-    border-radius: 4px;
-    margin-bottom: 2rem;
-    border-left: 4px solid #e3243b;
-  }
-
   .summary-tiles {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
     gap: 1rem;
     margin-bottom: 2rem;
   }
 
   .tile {
-    background: white;
+    background: #fff;
     padding: 1rem;
     border-radius: 4px;
     box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    text-align: center;
   }
 
   .tile-number {
@@ -298,25 +288,32 @@
     margin-top: 0.5rem;
   }
 
-  .controls {
+  .controls-section {
+    background: #f8f9fa;
+    padding: 1rem;
+    border-radius: 4px;
+    margin-bottom: 2rem;
     display: flex;
     flex-wrap: wrap;
-    gap: 2rem;
-    margin-bottom: 2rem;
-    padding: 1rem;
-    background: #f8f9fa;
-    border-radius: 4px;
+    gap: 1rem;
   }
 
   .control-group {
     display: flex;
-    flex-direction: column;
+    align-items: center;
     gap: 0.5rem;
   }
 
   .control-group label {
     font-weight: 500;
     color: #333;
+  }
+
+  .control-group input[type="number"],
+  .control-group select {
+    padding: 0.25rem 0.5rem;
+    border: 1px solid #ddd;
+    border-radius: 3px;
   }
 
   .checkbox-group {
@@ -328,34 +325,44 @@
   .checkbox-label {
     display: flex;
     align-items: center;
-    gap: 0.5rem;
-    padding: 0.25rem 0.5rem;
-    margin-bottom: -2px;
-    text-transform: capitalize;
+    gap: 0.25rem;
+    cursor: pointer;
+    padding-bottom: 2px;
   }
 
-  .plot-section, .table-section {
+  .plot-section {
     margin-bottom: 2rem;
   }
 
-  .plot-description, .table-description {
-    font-size: 0.9rem;
-    color: #666;
+  .plot-section h3 {
+    margin-bottom: 0.5rem;
+    color: #333;
+  }
+
+  .plot-description {
     margin-bottom: 1rem;
+    color: #666;
+    font-style: italic;
   }
 
   .plot-container {
-    min-height: 300px;
+    min-height: 400px;
     border: 1px solid #ddd;
     border-radius: 4px;
     padding: 1rem;
+    background: #fff;
     overflow-x: auto;
   }
 
+  .table-section {
+    margin-bottom: 2rem;
+  }
+
   .table-container {
-    overflow-x: auto;
-    border: 1px solid #ddd;
+    background: #fff;
     border-radius: 4px;
+    overflow: hidden;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
   }
 
   table {
@@ -363,32 +370,37 @@
     border-collapse: collapse;
   }
 
-  th, td {
-    padding: 0.5rem;
-    text-align: left;
-    border-bottom: 1px solid #eee;
-    font-size: 0.9rem;
+  thead {
+    background: #f8f9fa;
   }
 
   th {
-    background: #f8f9fa;
-    font-weight: 500;
-    position: sticky;
-    top: 0;
+    padding: 0.75rem;
+    text-align: left;
+    font-weight: 600;
+    color: #333;
+    border-bottom: 2px solid #dee2e6;
   }
 
-  .table-note {
-    padding: 0.5rem;
+  td {
+    padding: 0.5rem 0.75rem;
+    border-bottom: 1px solid #dee2e6;
+  }
+
+  tbody tr:hover {
     background: #f8f9fa;
-    font-size: 0.8rem;
-    color: #666;
-    margin: 0;
+  }
+
+  .no-data {
+    text-align: center;
+    padding: 2rem;
+    color: #6c757d;
   }
 
   .citation {
     margin-top: 2rem;
     padding-top: 2rem;
-    border-top: 1px solid #ddd;
+    border-top: 1px solid #dee2e6;
   }
 
   .citation code {
@@ -403,23 +415,6 @@
   .error {
     color: #e74c3c;
     text-align: center;
-    padding: 1rem;
-  }
-
-  h2, h3 {
-    margin: 0 0 1rem 0;
-    color: #333;
-  }
-
-  input[type="number"], select {
-    padding: 0.5rem;
-    border: 1px solid #ddd;
-    border-radius: 4px;
-    font-size: 0.9rem;
-  }
-
-  :global(.plot-container svg) {
-    max-width: 100%;
-    height: auto;
+    padding: 2rem;
   }
 </style>

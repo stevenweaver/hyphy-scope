@@ -35,21 +35,27 @@
     return MEME_COLORS[className as keyof typeof MEME_COLORS] || '#000000';
   }
 
-  $: if (data) {
+  // Main data processing reactive statement
+  $: if (data && pvalueThreshold !== undefined) {
     processData();
   }
 
-  $: if (sitesTable[0].length > 0 && showColumns) {
-    filteredSiteData = sitesTable[0].filter(x => showColumns.includes(x.class));
-    updatePlot();
+  // Filter data when sitesTable or showColumns change
+  $: {
+    if (sitesTable && sitesTable[0] && sitesTable[0].length > 0 && showColumns && showColumns.length > 0) {
+      const newFilteredData = sitesTable[0].filter(x => showColumns.includes(x.class));
+      if (newFilteredData.length !== filteredSiteData.length || 
+          !newFilteredData.every((item, index) => item === filteredSiteData[index])) {
+        filteredSiteData = newFilteredData;
+      }
+    }
   }
 
-  $: if (pvalueThreshold !== undefined) {
-    processData();
-  }
-
-  $: if (plotType && filteredSiteData.length > 0) {
-    updatePlot();
+  // Update plot when ready
+  $: {
+    if (plotType && filteredSiteData && filteredSiteData.length > 0 && plotContainer) {
+      updatePlot();
+    }
   }
 
   function processData() {
@@ -75,9 +81,8 @@
     if (!availablePlotTypes.includes(plotType) && availablePlotTypes.length > 0) {
       plotType = availablePlotTypes[0];
     }
-
-    filteredSiteData = sitesTable[0].filter(x => showColumns.includes(x.class));
-    updatePlot();
+    
+    // Filtering will be handled by reactive statement
   }
 
   function updatePlot() {
