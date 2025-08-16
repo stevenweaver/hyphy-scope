@@ -154,16 +154,17 @@ export function getFelSiteTableData(resultsJson: FelResults, pvalueThreshold: nu
         "alpha=beta": +row[2],
         "dN/dS MLE": +row[3],
         "p-value": +row[4],
-        class: row[4] <= pvalueThreshold ? (row[0] < row[1] ? "Diversifying" : "Purifying") : (row[0] + row[1] ? "Neutral" : "Invariable")
+        class: row[4] <= pvalueThreshold ? (row[0] < row[1] ? "Diversifying" : "Purifying") : ((row[0] + row[1]) > 0 ? "Neutral" : "Invariable")
       };
       
       // Add site index as first column data
       rowObject["Site"] = siteLookup[i] + 1;
-      rowObject[headers[1][0]] = +row[0];
-      rowObject[headers[2][0]] = +row[1];
-      rowObject[headers[3][0]] = +row[2];
-      rowObject[headers[4][0]] = +row[3];
-      rowObject[headers[5][0]] = +row[4];
+      // Don't overwrite the 'class' field we just set
+      if (headers[1][0] !== "class") rowObject[headers[1][0]] = +row[0];
+      if (headers[2][0] !== "class") rowObject[headers[2][0]] = +row[1];
+      if (headers[3][0] !== "class") rowObject[headers[3][0]] = +row[2];
+      if (headers[4][0] !== "class") rowObject[headers[4][0]] = +row[3];
+      if (headers[5][0] !== "class") rowObject[headers[5][0]] = +row[4];
       
       if (felAttrs.hasPositiveLRT) {
         rowObject[headers[6][0]] = +row[5];
@@ -176,7 +177,11 @@ export function getFelSiteTableData(resultsJson: FelResults, pvalueThreshold: nu
       }
       
       if (felAttrs.hasPasmt) {
-        rowObject[headers[headers.length-2][0]] = row[headers.length-3];
+        // Don't overwrite the 'class' field that was just set
+        const pasmtHeaderIndex = headers.length-3; // Skip the 'class' header we just added
+        if (pasmtHeaderIndex >= 0 && pasmtHeaderIndex < headers.length-1) {
+          rowObject[headers[pasmtHeaderIndex][0]] = row[headers.length-3];
+        }
       }
       
       results.push(rowObject);
