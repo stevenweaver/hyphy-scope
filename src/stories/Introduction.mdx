@@ -1,0 +1,67 @@
+import { Meta } from '@storybook/blocks';
+
+<Meta title="Introduction" />
+
+# HyPhy Scope Component Library
+
+Welcome to the HyPhy Scope Storybook! This is a collection of visualization components for displaying results from HyPhy (Hypothesis Testing using Phylogenies) analyses.
+
+## Overview
+
+HyPhy Scope provides Svelte components for visualizing various selection analysis methods:
+
+- **FEL (Fixed Effects Likelihood)**: Site-level selection analysis
+- **MEME (Mixed Effects Model of Evolution)**: Episodic selection analysis
+- **aBSREL (adaptive Branch-Site REL)**: Branch-level selection analysis
+- **BUSTED**: Gene-wide selection test
+- **RELAX**: Selection intensity changes
+- **SLAC**: Counting-based selection analysis
+- **BGM**: Bayesian Graphical Model for coevolution
+- **FADE**: FUBAR Approach to Directional Evolution
+- **GARD**: Genetic Algorithm for Recombination Detection
+- **Phylogenetic Tree Viewer**: Interactive tree visualization
+
+## Features
+
+- 📊 **Interactive Visualizations**: All components include interactive plots powered by Observable Plot
+- 🎨 **Customizable**: Control thresholds, colors, and display options
+- 📱 **Responsive**: Components adapt to different screen sizes
+- 🧪 **Well-tested**: Comprehensive test suite for all components
+- 📚 **TypeScript Support**: Full type definitions included
+
+## Getting Started
+
+### Installation
+
+```bash
+npm install hyphy-scope
+```
+
+### Basic Usage
+
+```javascript
+import { FelVisualization } from 'hyphy-scope';
+
+// Use the component with your HyPhy results
+<FelVisualization 
+  data={felResults} 
+  pvalueThreshold={0.1}
+/>
+```
+
+## Data Format
+
+All components expect data in HyPhy's standard JSON output format. You can load data from:
+
+1. **URL**: Using the `loadDataFromUrl` utility
+2. **Local Storage**: Using the `loadDataFromStorage` utility
+3. **Direct Import**: Import JSON files directly
+
+## Support
+
+- **GitHub**: [hyphy-scope](https://github.com/stevenweaver/hyphy-scope)
+- **HyPhy**: [hyphy.org](http://hyphy.org)
+
+## License
+
+This project is part of the HyPhy ecosystem for evolutionary analysis.
