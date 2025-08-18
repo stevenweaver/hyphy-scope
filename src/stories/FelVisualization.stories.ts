@@ -1,6 +1,8 @@
 import type { Meta, StoryObj } from '@storybook/svelte';
 import FelVisualization from '$lib/FelVisualization.svelte';
-import felTestData from '../data/fel_test_data.json';
+
+// Import test data from TypeScript file
+import { felTestData } from './data/fel-test-data';
 
 const meta = {
   title: 'Visualizations/FEL Visualization',

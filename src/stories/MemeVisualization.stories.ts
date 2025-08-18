@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/svelte';
 import MemeVisualization from '$lib/MemeVisualization.svelte';
-import memeTestData from '../data/meme_test_data.json';
+import { memeTestData } from './data/meme-test-data';
 
 const meta = {
   title: 'Visualizations/MEME Visualization',

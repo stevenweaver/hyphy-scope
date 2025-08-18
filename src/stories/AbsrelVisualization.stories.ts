@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/svelte';
 import AbsrelVisualization from '$lib/AbsrelVisualization.svelte';
-import absrelTestData from '../data/absrel_test_data.json';
+import { absrelTestData } from './data/absrel-test-data';
 
 const meta = {
   title: 'Visualizations/ABSREL Visualization',
