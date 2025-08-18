@@ -12,7 +12,6 @@ export { default as FadeVisualization } from './FadeVisualization.svelte';
 export { default as GardVisualization } from './GardVisualization.svelte';
 
 // Export utilities
-export * from './utils/fel-utils.js';
 export * from './utils/fel-plots.js';
 export * from './utils/meme-utils.js';
 export * from './utils/meme-plots.js';

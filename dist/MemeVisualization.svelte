@@ -148,7 +148,7 @@
         {#each tileSpecs as tile}
           <div class="tile">
             <div class="tile-number" style="color: {tile.color || '#333'}">
-              {tile.value}
+              {tile.number}
             </div>
             <div class="tile-description">{tile.description}</div>
           </div>
