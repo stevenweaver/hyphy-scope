@@ -27,7 +27,7 @@ export {};
 
 declare module "$app/types" {
 	export interface AppTypes {
-		RouteId(): "/" | "/absrel" | "/bgm" | "/busted" | "/components" | "/fade" | "/fel" | "/gard" | "/meme" | "/relax" | "/slac";
+		RouteId(): "/" | "/absrel" | "/bgm" | "/busted" | "/components" | "/fade" | "/fel" | "/gard" | "/meme" | "/relax" | "/slac" | "/tree";
 		RouteParams(): {
 			
 		};
@@ -42,9 +42,10 @@ declare module "$app/types" {
 			"/gard": Record<string, never>;
 			"/meme": Record<string, never>;
 			"/relax": Record<string, never>;
-			"/slac": Record<string, never>
+			"/slac": Record<string, never>;
+			"/tree": Record<string, never>
 		};
-		Pathname(): "/" | "/absrel" | "/bgm" | "/busted" | "/components" | "/fade" | "/fel" | "/gard" | "/meme" | "/relax" | "/slac";
+		Pathname(): "/" | "/absrel" | "/bgm" | "/busted" | "/components" | "/fade" | "/fel" | "/gard" | "/meme" | "/relax" | "/slac" | "/tree";
 		ResolvedPathname(): `${"" | `/${string}`}${ReturnType<AppTypes['Pathname']>}`;
 		Asset(): never;
 	}

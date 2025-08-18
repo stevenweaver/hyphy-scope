@@ -2,13 +2,88 @@
   import { onMount } from 'svelte';
   import * as _ from 'lodash-es';
   import * as Plot from '@observablehq/plot';
-  import { 
-    getFelAttributes, 
-    getFelTileSpecs, 
-    getFelSiteTableData,
-    COLORS,
-    type SiteData
-  } from './utils/fel-utils.js';
+  // Define constants and interfaces locally
+  const COLORS = {
+    'Diversifying': '#e74c3c',
+    'Neutral': '#95a5a6', 
+    'Purifying': '#3498db',
+    'Invariable': '#ecf0f1'
+  };
+
+  interface SiteData {
+    codon: number;
+    alpha: number;
+    beta: number;
+    'p-value': number;
+    'dN/dS MLE': number;
+    LRT: number;
+    class: string;
+  }
+
+  // Duplicate utility functions locally
+  function getFelAttributes(data: any) {
+    return {
+      numberOfSites: data?.MLE?.content?.["0"]?.length || 0,
+      numberOfBranches: Object.keys(data?.MLE?.content || {}).length
+    };
+  }
+
+  function getFelTileSpecs(data: any, pValue: number) {
+    if (!data?.MLE?.content?.["0"]) return [];
+    
+    const sites = data.MLE.content["0"];
+    let diversifying = 0, neutral = 0, purifying = 0, invariable = 0;
+    
+    sites.forEach((site: any[]) => {
+      const pVal = site[4] || 1;
+      const omega = site[2] || 1;
+      
+      if (pVal <= pValue) {
+        if (omega > 1) diversifying++;
+        else if (omega < 1) purifying++;
+        else neutral++;
+      } else {
+        invariable++;
+      }
+    });
+
+    return [
+      { number: sites.length, description: "Total sites" },
+      { number: diversifying, description: "Diversifying", color: COLORS['Diversifying'] },
+      { number: purifying, description: "Purifying", color: COLORS['Purifying'] }, 
+      { number: neutral, description: "Neutral", color: COLORS['Neutral'] },
+      { number: invariable, description: "Invariable", color: COLORS['Invariable'] }
+    ];
+  }
+
+  function getFelSiteTableData(data: any, pValue: number): [SiteData[], any[], any] {
+    if (!data?.MLE?.content?.["0"]) return [[], [], {}];
+    
+    const sites = data.MLE.content["0"];
+    const processedSites: SiteData[] = sites.map((site: any[], index: number) => {
+      const pVal = site[4] || 1;
+      const omega = site[2] || 1;
+      let classification = 'Invariable';
+      
+      if (pVal <= pValue) {
+        if (omega > 1) classification = 'Diversifying';
+        else if (omega < 1) classification = 'Purifying';
+        else classification = 'Neutral';
+      }
+      
+      return {
+        codon: index + 1,
+        alpha: site[0] || 0,
+        beta: site[1] || 0,
+        'p-value': pVal,
+        'dN/dS MLE': omega,
+        LRT: site[3] || 0,
+        class: classification
+      };
+    });
+
+    return [processedSites, [], {}];
+  }
 
   export let data: any = null;
 

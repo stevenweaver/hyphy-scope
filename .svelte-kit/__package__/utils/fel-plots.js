@@ -1,6 +1,12 @@
 import * as Plot from "@observablehq/plot";
 import * as _ from "lodash-es";
-import { COLORS } from "./fel-utils.js";
+// Colors and types moved to FEL component
+const COLORS = {
+    'Diversifying': '#e74c3c',
+    'Neutral': '#95a5a6',
+    'Purifying': '#3498db',
+    'Invariable': '#ecf0f1'
+};
 const DYN_RANGE_CAP = 10;
 export function getFelPlotOptions(hasPasmt) {
     return [
