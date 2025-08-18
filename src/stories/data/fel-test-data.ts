@@ -24,6 +24,11 @@ export const felTestData = {
       ["Total branch length", "The total length of branches contributing to inference at this site"]
     ]
   },
+  "data partitions": {
+    "0": {
+      "coverage": [[0, 1, 2, 3, 4, 5, 6, 7, 8, 9]]
+    }
+  },
   "fits": {
     "Null model": {
       "LogL": -3624.46,
@@ -39,13 +44,13 @@ export const felTestData = {
   "input": {
     "file name": "sample.fas",
     "number of sequences": 8,
-    "number of sites": 564,
+    "number of sites": 10,
     "partition count": 1
   },
   "test results": {
     "P-value threshold": 0.1,
-    "tested": 564,
-    "positive test results": 45,
-    "negative test results": 519
+    "tested": 10,
+    "positive test results": 4,
+    "negative test results": 6
   }
 };

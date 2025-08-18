@@ -24,6 +24,11 @@ export const memeTestData = {
       ["p-value", "Asymptotic p-value for episodic diversification"]
     ]
   },
+  "data partitions": {
+    "0": {
+      "coverage": [[0, 1, 2, 3, 4, 5, 6, 7, 8, 9]]
+    }
+  },
   "fits": {
     "Null model": {
       "LogL": -2456.78,
@@ -39,13 +44,13 @@ export const memeTestData = {
   "input": {
     "file name": "sample.fas",
     "number of sequences": 8,
-    "number of sites": 400,
+    "number of sites": 10,
     "partition count": 1
   },
   "test results": {
     "P-value threshold": 0.1,
-    "tested": 400,
-    "positive test results": 23,
-    "negative test results": 377
+    "tested": 10,
+    "positive test results": 4,
+    "negative test results": 6
   }
 };
