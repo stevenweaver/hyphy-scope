@@ -1,1 +1,0 @@
-import"./CWj6FrbW.js";import"./D_-aaKZl.js";import{f as m,t as s,a as p,c as l,r as f}from"./DFDNEQV0.js";import{s as i}from"./y1NYNGaY.js";import{p as c}from"./rOhOFPaZ.js";import"./BWWySPzG.js";var d=m('<h1 class="svelte-9de6e"> </h1>');function W(e,r){let o=c(r,"name",8,"World");var t=d(),a=l(t);f(t),s(()=>i(a,`Hello ${o()??""}!`)),p(e,t)}export{W as H};
