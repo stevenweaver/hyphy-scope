@@ -18,6 +18,7 @@
 				<a href="/bgm">BGM</a>
 				<a href="/fade">FADE</a>
 				<a href="/gard">GARD</a>
+				<a href="/tree">Tree</a>
 			</div>
 		</nav>
 		<h1>HyPhy Scope</h1>

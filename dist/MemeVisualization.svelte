@@ -180,8 +180,9 @@
       </div>
 
       <div class="control-group">
-        <label>Show classes:</label>
-        <div class="checkbox-group">
+        <fieldset>
+          <legend>Show classes:</legend>
+          <div class="checkbox-group">
           {#each Object.keys(MEME_COLORS) as className}
             <label class="checkbox-label" style="border-bottom: 2px solid {getMemeColorForClass(className)}">
               <input 
@@ -192,7 +193,8 @@
               {className}
             </label>
           {/each}
-        </div>
+          </div>
+        </fieldset>
       </div>
     </div>
 

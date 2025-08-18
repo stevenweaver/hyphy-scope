@@ -1,4 +1,18 @@
-import { type SiteData } from "./fel-utils.js";
+interface SiteData {
+    partition: number;
+    codon: number;
+    Site: number;
+    alpha: number;
+    beta: number;
+    "alpha=beta": number;
+    "dN/dS MLE": number;
+    "p-value": number;
+    "p-asmp"?: number;
+    "dN/dS LB"?: number;
+    "dN/dS UB"?: number;
+    class: "Diversifying" | "Purifying" | "Neutral" | "Invariable";
+    [key: string]: any;
+}
 interface PlotOption {
     label: string;
     available: (data: any) => boolean;

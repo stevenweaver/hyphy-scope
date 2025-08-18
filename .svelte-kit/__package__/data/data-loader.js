@@ -13,5 +13,33 @@ export async function getTestData(analysis) {
         return null;
     }
 }
-// Re-export the existing loader functions
-export { loadDataFromUrl, loadDataFromStorage } from '../utils/fel-utils.js';
+// Loader functions for URL and localStorage (moved from fel-utils)
+export async function loadDataFromUrl(url) {
+    if (!url)
+        return null;
+    try {
+        const response = await fetch(url);
+        const data = await response.json();
+        return data?.MLE ? data : null;
+    }
+    catch (error) {
+        console.error('Error loading JSON from URL:', error);
+        return null;
+    }
+}
+export function loadDataFromStorage(id) {
+    if (!id)
+        return null;
+    try {
+        const key = `hyphy-results-${id}`;
+        const localData = localStorage.getItem(key);
+        if (localData) {
+            const data = JSON.parse(localData);
+            return data?.MLE ? data : null;
+        }
+    }
+    catch (error) {
+        console.error('Error parsing localStorage data:', error);
+    }
+    return null;
+}

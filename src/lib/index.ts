@@ -10,6 +10,7 @@ export { default as SlacVisualization } from './SlacVisualization.svelte';
 export { default as BgmVisualization } from './BgmVisualization.svelte';
 export { default as FadeVisualization } from './FadeVisualization.svelte';
 export { default as GardVisualization } from './GardVisualization.svelte';
+export { default as PhylogeneticTreeViewer } from './PhylogeneticTreeViewer.svelte';
 
 // Export utilities
 export * from './utils/fel-plots.js';

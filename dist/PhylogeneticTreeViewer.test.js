@@ -1,0 +1,125 @@
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { render, screen, waitFor } from '@testing-library/svelte';
+import PhylogeneticTreeViewer from './PhylogeneticTreeViewer.svelte';
+// Mock phylotree library
+const mockPhylotree = vi.fn(() => ({
+    size: vi.fn().mockReturnThis(),
+    separation: vi.fn().mockReturnThis(),
+    node_circle_size: vi.fn().mockReturnThis(),
+    style_nodes: vi.fn().mockReturnThis(),
+    style_edges: vi.fn().mockReturnThis(),
+    layout: vi.fn().mockReturnThis(),
+    get_nodes: vi.fn(() => [])
+}));
+vi.mock('phylotree', () => ({
+    default: mockPhylotree
+}));
+// Mock D3
+vi.mock('d3', () => ({
+    select: vi.fn(() => ({
+        append: vi.fn(() => ({
+            attr: vi.fn().mockReturnThis(),
+            style: vi.fn().mockReturnThis()
+        })),
+        style: vi.fn().mockReturnThis()
+    })),
+    scaleSequential: vi.fn(() => ({
+        domain: vi.fn().mockReturnThis()
+    })),
+    interpolateViridis: vi.fn(),
+    extent: vi.fn(() => [0, 1])
+}));
+beforeEach(() => {
+    // Reset DOM
+    document.head.innerHTML = '';
+});
+const sampleTreeData = {
+    input: {
+        trees: [
+            "((A:0.1,B:0.2):0.05,(C:0.15,D:0.1):0.05);"
+        ]
+    },
+    "branch attributes": [
+        {
+            "A": {
+                "branch length": 0.1,
+                "dN/dS": 0.5
+            },
+            "B": {
+                "branch length": 0.2,
+                "dN/dS": 1.5
+            }
+        }
+    ]
+};
+describe('PhylogeneticTreeViewer', () => {
+    it('renders without data', () => {
+        render(PhylogeneticTreeViewer, { data: null });
+        expect(screen.getByText('No tree data provided')).toBeInTheDocument();
+    });
+    it('shows loading state initially', () => {
+        render(PhylogeneticTreeViewer, { data: sampleTreeData });
+        expect(screen.getByText('Loading phylogenetic tree library...')).toBeInTheDocument();
+    });
+    it('accepts tree configuration props', () => {
+        const { container } = render(PhylogeneticTreeViewer, {
+            data: sampleTreeData,
+            width: 600,
+            height: 400,
+            branchLengthProperty: 'dN/dS',
+            colorBranches: 'branch length',
+            showLabels: false,
+            treeIndex: 0
+        });
+        expect(container).toBeInTheDocument();
+    });
+    it('shows loading state with tree data', () => {
+        render(PhylogeneticTreeViewer, {
+            data: sampleTreeData
+        });
+        // Should show loading state when phylotree library is being loaded
+        expect(screen.getByText('Loading phylogenetic tree library...')).toBeInTheDocument();
+    });
+});
+describe('PhylogeneticTreeViewer Data Parsing', () => {
+    it('handles array format trees', () => {
+        const arrayTreeData = {
+            input: {
+                trees: [
+                    "((A:0.1,B:0.2):0.05);",
+                    "((C:0.15,D:0.1):0.05);"
+                ]
+            }
+        };
+        render(PhylogeneticTreeViewer, { data: arrayTreeData });
+        expect(screen.getByText('Loading phylogenetic tree library...')).toBeInTheDocument();
+    });
+    it('handles object format trees', () => {
+        const objectTreeData = {
+            input: {
+                trees: {
+                    "tree1": "((A:0.1,B:0.2):0.05);",
+                    "tree2": "((C:0.15,D:0.1):0.05);"
+                }
+            }
+        };
+        render(PhylogeneticTreeViewer, { data: objectTreeData });
+        expect(screen.getByText('Loading phylogenetic tree library...')).toBeInTheDocument();
+    });
+    it('handles string format tree', () => {
+        const stringTreeData = {
+            input: {
+                trees: "((A:0.1,B:0.2):0.05,(C:0.15,D:0.1):0.05);"
+            }
+        };
+        render(PhylogeneticTreeViewer, { data: stringTreeData });
+        expect(screen.getByText('Loading phylogenetic tree library...')).toBeInTheDocument();
+    });
+    it('handles missing tree data gracefully', () => {
+        const noTreeData = {
+            input: {}
+        };
+        render(PhylogeneticTreeViewer, { data: noTreeData });
+        expect(screen.getByText('Loading phylogenetic tree library...')).toBeInTheDocument();
+    });
+});
