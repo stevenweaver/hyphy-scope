@@ -1,6 +1,29 @@
 import * as Plot from "@observablehq/plot";
 import * as _ from "lodash-es";
-import { COLORS, type SiteData } from "./fel-utils.js";
+
+// Colors and types moved to FEL component
+const COLORS = {
+  'Diversifying': '#e74c3c',
+  'Neutral': '#95a5a6', 
+  'Purifying': '#3498db',
+  'Invariable': '#ecf0f1'
+};
+
+interface SiteData {
+  partition: number;
+  codon: number;
+  Site: number;
+  alpha: number;
+  beta: number;
+  "alpha=beta": number;
+  "dN/dS MLE": number;
+  "p-value": number;
+  "p-asmp"?: number;
+  "dN/dS LB"?: number;
+  "dN/dS UB"?: number;
+  class: "Diversifying" | "Purifying" | "Neutral" | "Invariable";
+  [key: string]: any;
+}
 
 const DYN_RANGE_CAP = 10;
 
