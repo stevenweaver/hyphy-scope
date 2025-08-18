@@ -1,15 +1,69 @@
-.DS_Store
-node_modules
-/build
-/dist
-/.svelte-kit
-/package
+# Dependencies
+node_modules/
+/.pnp
+.pnp.js
+
+# Production builds
+/build/
+/dist/
+/.svelte-kit/
+/package/
+
+# Environment files
 .env
 .env.*
 !.env.example
-vite.config.js.timestamp-*
-vite.config.ts.timestamp-*
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# IDE/Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Coverage directory used by tools like istanbul
+coverage/
+*.lcov
+
+# Dependency directories
+node_modules/
+jspm_packages/
 
 # Storybook
-storybook-static
-*.log
+storybook-static/
+*.stories.js.map
+
+# Temporary folders
+tmp/
+temp/
+
+# Cache
+.cache/
+.parcel-cache/
+.eslintcache
+
+# Build timestamps
+vite.config.js.timestamp-*
+vite.config.ts.timestamp-*
