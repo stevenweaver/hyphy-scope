@@ -3,16 +3,18 @@ import { render, screen, waitFor } from '@testing-library/svelte';
 
 // Mock phylotree before importing component
 vi.mock('phylotree', () => {
-  const mockRender = vi.fn(() => ({
+  const mockDisplay = {
     style_nodes: vi.fn().mockReturnThis(),
     style_edges: vi.fn().mockReturnThis(),
-    placenodes: vi.fn().mockReturnThis(),
-    update: vi.fn().mockReturnThis()
-  }));
+    show: vi.fn(() => '<svg></svg>')
+  };
+
+  const mockRender = vi.fn(() => mockDisplay);
 
   const mockPhylotreeConstructor = vi.fn(() => ({
     branch_length: vi.fn().mockReturnThis(),
-    render: mockRender
+    render: mockRender,
+    display: mockDisplay
   }));
 
   return {
@@ -32,7 +34,8 @@ vi.mock('d3', () => ({
       attr: vi.fn().mockReturnThis(),
       style: vi.fn().mockReturnThis()
     })),
-    style: vi.fn().mockReturnThis()
+    style: vi.fn().mockReturnThis(),
+    html: vi.fn().mockReturnThis()
   })),
   scaleSequential: vi.fn(() => ({
     domain: vi.fn().mockReturnThis()

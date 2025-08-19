@@ -96,15 +96,17 @@
         });
       }
 
-      // Render tree with options similar to hyphy-eye
-      const rendered = phylotreeInstance.render(`#${treeContainerId}`, {
+      // Render tree with options matching phylotree.js examples
+      const rendered = phylotreeInstance.render({
+        container: `#${treeContainerId}`,
         'height': height - 40,
         'width': width - 40,
         'show-scale': showScale,
         'is-radial': isRadial,
         'left-right-spacing': 'fit-to-size',
         'top-bottom-spacing': 'fit-to-size',
-        'node_circle_size': showLabels ? 0 : 3
+        'draw-size-bubbles': false,
+        zoom: false
       });
 
       // Apply branch styling
@@ -119,7 +121,7 @@
           const colorScale = d3.scaleSequential(d3.interpolateViridis)
             .domain(d3.extent(values));
 
-          rendered.style_edges((element: any, data: any) => {
+          phylotreeInstance.display.style_edges((element: any, data: any) => {
             const targetName = data.target.data.name;
             if (targetName && branchAttrs[targetName]) {
               const value = branchAttrs[targetName][branchLengthProperty];
@@ -134,7 +136,7 @@
 
       // Style nodes and add labels
       if (showLabels) {
-        rendered.style_nodes((element: any, data: any) => {
+        phylotreeInstance.display.style_nodes((element: any, data: any) => {
           // Hide internal node circles when showing labels
           if (data.children) {
             d3.select(element).style('display', 'none');
@@ -142,9 +144,8 @@
         });
       }
 
-      // Update the tree layout
-      rendered.placenodes();
-      rendered.update();
+      // Follow the phylotree.js example pattern
+      d3.select(`#${treeContainerId}`).html(phylotreeInstance.display.show());
 
     } catch (error) {
       console.error('Error rendering tree:', error);
