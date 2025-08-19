@@ -6,6 +6,7 @@
     getFelPlotDescription,
     createFelPlot
   } from './utils/fel-plots.js';
+  import PhylogeneticTreeViewer from './PhylogeneticTreeViewer.svelte';
 
   // FEL utility types and interfaces
   interface FelResults {
@@ -446,6 +447,22 @@
       ></div>
     </div>
 
+    <!-- Phylogenetic Tree section -->
+    <div class="tree-section">
+      <h3>Figure 2</h3>
+      <p class="tree-description">Phylogenetic tree used in the FEL analysis. Branches can be colored by evolutionary rates.</p>
+      <PhylogeneticTreeViewer 
+        {data} 
+        width={800} 
+        height={500}
+        branchLengthProperty="branch length"
+        colorBranches="none"
+        showLabels={true}
+        showScale={true}
+        isRadial={false}
+        treeIndex={0}
+      />
+    </div>
 
     <!-- Results table -->
     <div class="table-section">
@@ -682,6 +699,16 @@
     padding: 1rem;
     background: #fff;
     overflow-x: auto;
+  }
+
+  .tree-section {
+    margin: 2rem 0;
+  }
+
+  .tree-description {
+    color: #666;
+    margin-bottom: 1rem;
+    line-height: 1.5;
   }
 
   .table-section {

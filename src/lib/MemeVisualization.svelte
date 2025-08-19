@@ -15,6 +15,7 @@
     getMemePlotDescription,
     createMemePlot
   } from './utils/meme-plots.js';
+  import PhylogeneticTreeViewer from './PhylogeneticTreeViewer.svelte';
 
   export let data: any = null;
   export let pvalueThreshold: number = 0.1;
@@ -208,6 +209,23 @@
       ></div>
     </div>
 
+    <!-- Phylogenetic Tree section -->
+    <div class="tree-section">
+      <h3>Figure 2</h3>
+      <p class="tree-description">Phylogenetic tree used in the MEME analysis. Branches can be colored by evolutionary rates.</p>
+      <PhylogeneticTreeViewer 
+        {data} 
+        width={800} 
+        height={500}
+        branchLengthProperty="branch length"
+        colorBranches="none"
+        showLabels={true}
+        showScale={true}
+        isRadial={false}
+        treeIndex={0}
+      />
+    </div>
+
     <!-- Results table -->
     <div class="table-section">
       <h3>Table 1</h3>
@@ -360,6 +378,16 @@
     padding: 1rem;
     background: #fff;
     overflow-x: auto;
+  }
+
+  .tree-section {
+    margin: 2rem 0;
+  }
+
+  .tree-description {
+    color: #666;
+    margin-bottom: 1rem;
+    line-height: 1.5;
   }
 
   .table-section {
