@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte';
   import * as d3 from 'd3';
+  import { phylotree } from 'phylotree';
   
   export let data: any = null;
   export let width: number = 800;
@@ -14,25 +15,16 @@
 
   let containerElement: HTMLDivElement;
   let phylotreeInstance: any = null;
-  let loadingPhylotree = true;
   let treeContainerId = `tree-container-${Math.random().toString(36).substr(2, 9)}`;
 
-  async function loadPhylotreeLibrary() {
-    try {
-      // Load phylotree CSS - use the correct version
+  function loadPhylotreeCSS() {
+    // Load phylotree CSS - use the correct version
+    const existingLink = document.querySelector('link[href*="phylotree.css"]');
+    if (!existingLink) {
       const link = document.createElement('link');
       link.rel = 'stylesheet';
       link.href = 'https://cdn.jsdelivr.net/npm/phylotree@2.1.7/dist/phylotree.css';
       document.head.appendChild(link);
-
-      // Import phylotree dynamically
-      const phylotree = await import('phylotree');
-      loadingPhylotree = false;
-      return phylotree;
-    } catch (error) {
-      console.error('Failed to load phylotree library:', error);
-      loadingPhylotree = false;
-      return null;
     }
   }
 
@@ -71,17 +63,17 @@
   }
 
 
-  async function renderTree() {
-    if (!containerElement || !data || loadingPhylotree) return;
-    
-    const phylotreeLib = await loadPhylotreeLibrary();
-    if (!phylotreeLib) return;
+  function renderTree() {
+    if (!containerElement || !data) return;
 
     const newick = getTreeNewick(data, treeIndex);
     if (!newick) {
       containerElement.innerHTML = '<p>No tree data found</p>';
       return;
     }
+
+    // Load CSS if needed
+    loadPhylotreeCSS();
 
     // Clear container and add div with ID for phylotree
     containerElement.innerHTML = '';
@@ -91,7 +83,7 @@
     
     try {
       // Create phylotree instance using the constructor
-      phylotreeInstance = new phylotreeLib.phylotree(newick);
+      phylotreeInstance = new phylotree(newick);
       
       // Set branch length accessor if we have branch attributes
       const branchAttrs = getBranchAttributes(data, treeIndex);
@@ -172,7 +164,7 @@
     }
   });
 
-  $: if (data && containerElement && !loadingPhylotree) {
+  $: if (data && containerElement) {
     renderTree();
   }
 </script>
@@ -180,8 +172,6 @@
 <div class="phylogenetic-tree-viewer">
   {#if !data}
     <div class="loading">No tree data provided</div>
-  {:else if loadingPhylotree}
-    <div class="loading">Loading phylogenetic tree library...</div>
   {:else}
     <div class="controls">
       <div class="control-group">
