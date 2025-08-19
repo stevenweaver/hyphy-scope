@@ -465,7 +465,7 @@
             type="range" 
             bind:value={treeWidth} 
             min="400" 
-            max="1200" 
+            max="2400" 
             step="50"
             class="tree-slider"
           />
@@ -477,7 +477,7 @@
             type="range" 
             bind:value={treeHeight} 
             min="300" 
-            max="800" 
+            max="1600" 
             step="25"
             class="tree-slider"
           />

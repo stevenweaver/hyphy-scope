@@ -111,7 +111,7 @@ export const TreeVisualizationFocus: Story = {
   parameters: {
     docs: {
       description: {
-        story: 'FEL analysis with focus on the phylogenetic tree visualization. Use the width and height sliders above the tree to adjust dimensions for better viewing of different tree sizes.'
+        story: 'FEL analysis with focus on the phylogenetic tree visualization. Use the width (400-2400px) and height (300-1600px) sliders above the tree to adjust dimensions for better viewing of different tree sizes.'
       }
     }
   }
