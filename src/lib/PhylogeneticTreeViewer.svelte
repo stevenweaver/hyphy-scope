@@ -82,16 +82,11 @@
     containerElement.appendChild(treeDiv);
     
     try {
-      console.log('Creating phylotree with newick:', newick);
-      console.log('phylotree module:', phylotree);
-      
       // Parse the newick string first
       const parsedTree = phylotree.newickParser(newick);
-      console.log('Parsed tree:', parsedTree);
       
       // Create phylotree instance using the parsed tree
       phylotreeInstance = phylotree.phylotree(parsedTree);
-      console.log('phylotreeInstance created:', phylotreeInstance);
       
       // Set branch length accessor if we have branch attributes
       const branchAttrs = getBranchAttributes(data, treeIndex);
