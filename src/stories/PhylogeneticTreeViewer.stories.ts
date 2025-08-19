@@ -1,40 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/svelte';
 import PhylogeneticTreeViewer from '$lib/PhylogeneticTreeViewer.svelte';
-
-const sampleTreeData = {
-  input: {
-    trees: [
-      "((Human:0.1,Chimp:0.2):0.05,(Gorilla:0.15,Orangutan:0.1):0.05);",
-      "((A:0.25,B:0.3):0.1,(C:0.2,D:0.15):0.1);"
-    ]
-  },
-  "branch attributes": [
-    {
-      "Human": {
-        "branch length": 0.1,
-        "dN/dS": 0.5
-      },
-      "Chimp": {
-        "branch length": 0.2,
-        "dN/dS": 1.5
-      },
-      "Gorilla": {
-        "branch length": 0.15,
-        "dN/dS": 0.8
-      },
-      "Orangutan": {
-        "branch length": 0.1,
-        "dN/dS": 1.2
-      }
-    },
-    {
-      "A": { "branch length": 0.25 },
-      "B": { "branch length": 0.3 },
-      "C": { "branch length": 0.2 },
-      "D": { "branch length": 0.15 }
-    }
-  ]
-};
+import { phylotreeTestData, largePhylotreeTestData } from './data/phylotree-test-data';
 
 const meta = {
   title: 'Visualizations/Phylogenetic Tree Viewer',
@@ -84,10 +50,10 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-// Default primate tree
+// Default mammal tree
 export const Default: Story = {
   args: {
-    data: sampleTreeData,
+    data: phylotreeTestData,
     width: 800,
     height: 600,
     branchLengthProperty: 'branch length',
@@ -97,23 +63,23 @@ export const Default: Story = {
   }
 };
 
-// Tree with branch coloring
+// Tree with branch coloring by dN/dS
 export const ColoredBranches: Story = {
   args: {
-    data: sampleTreeData,
+    data: phylotreeTestData,
     width: 800,
     height: 600,
-    branchLengthProperty: 'branch length',
+    branchLengthProperty: 'dN/dS',
     colorBranches: 'branch length',
     showLabels: true,
     treeIndex: 0
   }
 };
 
-// Second tree in dataset
-export const SecondTree: Story = {
+// Primate tree (second tree in dataset)
+export const PrimateTree: Story = {
   args: {
-    data: sampleTreeData,
+    data: phylotreeTestData,
     width: 800,
     height: 600,
     branchLengthProperty: 'branch length',
@@ -126,7 +92,7 @@ export const SecondTree: Story = {
 // Compact view without labels
 export const CompactView: Story = {
   args: {
-    data: sampleTreeData,
+    data: phylotreeTestData,
     width: 600,
     height: 400,
     branchLengthProperty: 'branch length',
@@ -137,13 +103,13 @@ export const CompactView: Story = {
 };
 
 // Large tree view
-export const LargeView: Story = {
+export const LargeTreeView: Story = {
   args: {
-    data: sampleTreeData,
+    data: largePhylotreeTestData,
     width: 1000,
     height: 700,
     branchLengthProperty: 'branch length',
-    colorBranches: 'branch length',
+    colorBranches: 'none',
     showLabels: true,
     treeIndex: 0
   }
