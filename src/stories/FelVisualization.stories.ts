@@ -36,7 +36,7 @@ const meta = {
     layout: 'padded',
     docs: {
       description: {
-        component: 'FEL (Fixed Effects Likelihood) visualization component for displaying site-level selection analysis results from HyPhy.'
+        component: 'FEL (Fixed Effects Likelihood) visualization component for displaying site-level selection analysis results from HyPhy. Includes interactive phylogenetic tree viewer with adjustable dimensions.'
       }
     }
   }
@@ -95,6 +95,23 @@ export const StrictThreshold: Story = {
     docs: {
       description: {
         story: 'FEL visualization with a very strict p-value threshold (0.01)'
+      }
+    }
+  }
+};
+
+// Story highlighting the phylogenetic tree features
+export const TreeVisualizationFocus: Story = {
+  args: {
+    data: felTestData,
+    pvalueThreshold: 0.1,
+    showColumns: ['Diversifying', 'Purifying'],
+    plotType: 'alpha/beta site-level estimates'
+  },
+  parameters: {
+    docs: {
+      description: {
+        story: 'FEL analysis with focus on the phylogenetic tree visualization. Use the width and height sliders above the tree to adjust dimensions for better viewing of different tree sizes.'
       }
     }
   }

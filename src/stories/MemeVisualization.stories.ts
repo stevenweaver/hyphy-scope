@@ -34,7 +34,7 @@ const meta = {
     layout: 'padded',
     docs: {
       description: {
-        component: 'MEME (Mixed Effects Model of Evolution) visualization component for displaying episodic selection analysis results from HyPhy.'
+        component: 'MEME (Mixed Effects Model of Evolution) visualization component for displaying episodic selection analysis results from HyPhy. Includes interactive phylogenetic tree viewer with adjustable dimensions.'
       }
     }
   }
@@ -88,5 +88,22 @@ export const Loading: Story = {
   args: {
     data: null,
     pvalueThreshold: 0.1
+  }
+};
+
+// Story highlighting the phylogenetic tree features
+export const TreeVisualizationFocus: Story = {
+  args: {
+    data: memeTestData,
+    pvalueThreshold: 0.1,
+    showColumns: ['Diversifying', 'Neutral'],
+    plotType: 'p-values for selection'
+  },
+  parameters: {
+    docs: {
+      description: {
+        story: 'MEME analysis with focus on the phylogenetic tree visualization. Use the width and height sliders above the tree to adjust dimensions for better viewing of different tree sizes.'
+      }
+    }
   }
 };

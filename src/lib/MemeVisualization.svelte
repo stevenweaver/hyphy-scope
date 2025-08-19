@@ -22,6 +22,10 @@
   export let showColumns: string[] = ["Diversifying", "Neutral", "Invariable"];
   export let plotType: string = "p-values for selection";
 
+  // Tree visualization settings
+  let treeWidth = 800;
+  let treeHeight = 500;
+
   // Core state
   let attributes: any = {};
   let sitesTable: [MemeSiteData[], any[], any] = [[], [], {}];
@@ -213,10 +217,39 @@
     <div class="tree-section">
       <h3>Figure 2</h3>
       <p class="tree-description">Phylogenetic tree used in the MEME analysis. Branches can be colored by evolutionary rates.</p>
+      
+      <!-- Tree size controls -->
+      <div class="tree-controls">
+        <div class="tree-control-group">
+          <label for="tree-width">Width: {treeWidth}px</label>
+          <input 
+            id="tree-width"
+            type="range" 
+            bind:value={treeWidth} 
+            min="400" 
+            max="1200" 
+            step="50"
+            class="tree-slider"
+          />
+        </div>
+        <div class="tree-control-group">
+          <label for="tree-height">Height: {treeHeight}px</label>
+          <input 
+            id="tree-height"
+            type="range" 
+            bind:value={treeHeight} 
+            min="300" 
+            max="800" 
+            step="25"
+            class="tree-slider"
+          />
+        </div>
+      </div>
+
       <PhylogeneticTreeViewer 
         {data} 
-        width={800} 
-        height={500}
+        width={treeWidth} 
+        height={treeHeight}
         branchLengthProperty="branch length"
         colorBranches="none"
         showLabels={true}
@@ -388,6 +421,59 @@
     color: #666;
     margin-bottom: 1rem;
     line-height: 1.5;
+  }
+
+  .tree-controls {
+    display: flex;
+    gap: 2rem;
+    margin-bottom: 1rem;
+    padding: 1rem;
+    background: #f8f9fa;
+    border-radius: 4px;
+    flex-wrap: wrap;
+  }
+
+  .tree-control-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    min-width: 200px;
+  }
+
+  .tree-control-group label {
+    font-weight: 500;
+    color: #333;
+    font-size: 0.9rem;
+  }
+
+  .tree-slider {
+    width: 100%;
+    height: 6px;
+    border-radius: 3px;
+    background: #ddd;
+    outline: none;
+    cursor: pointer;
+  }
+
+  .tree-slider::-webkit-slider-thumb {
+    appearance: none;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: #007bff;
+    cursor: pointer;
+    border: 2px solid #fff;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+  }
+
+  .tree-slider::-moz-range-thumb {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: #007bff;
+    cursor: pointer;
+    border: 2px solid #fff;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
   }
 
   .table-section {
