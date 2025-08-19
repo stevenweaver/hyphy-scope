@@ -6,21 +6,27 @@ vi.mock('phylotree', () => {
   const mockDisplay = {
     style_nodes: vi.fn().mockReturnThis(),
     style_edges: vi.fn().mockReturnThis(),
-    show: vi.fn(() => '<svg></svg>')
+    show: vi.fn(() => {
+      const mockSvg = document.createElement('svg');
+      return mockSvg;
+    })
   };
 
-  const mockRender = vi.fn(() => mockDisplay);
+  const mockRender = vi.fn(() => ({
+    style_edges: vi.fn().mockReturnThis(),
+    style_nodes: vi.fn().mockReturnThis(),
+    show: vi.fn(() => {
+      const mockSvg = document.createElement('svg');
+      return mockSvg;
+    })
+  }));
 
   const mockPhylotreeConstructor = vi.fn(() => ({
     branch_length: vi.fn().mockReturnThis(),
-    render: mockRender,
-    display: mockDisplay
+    render: mockRender
   }));
 
   return {
-    default: {
-      phylotree: mockPhylotreeConstructor
-    },
     phylotree: mockPhylotreeConstructor
   };
 });
@@ -35,11 +41,16 @@ vi.mock('d3', () => ({
       style: vi.fn().mockReturnThis()
     })),
     style: vi.fn().mockReturnThis(),
-    html: vi.fn().mockReturnThis()
+    html: vi.fn().mockReturnThis(),
+    selectAll: vi.fn(() => ({
+      on: vi.fn().mockReturnThis()
+    }))
   })),
   scaleSequential: vi.fn(() => ({
     domain: vi.fn().mockReturnThis()
   })),
+  scaleOrdinal: vi.fn(() => vi.fn()),
+  schemeCategory10: ['#1f77b4', '#ff7f0e', '#2ca02c'],
   interpolateViridis: vi.fn(),
   extent: vi.fn(() => [0, 1])
 }));
