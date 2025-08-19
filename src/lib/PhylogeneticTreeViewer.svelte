@@ -8,18 +8,21 @@
   export let branchLengthProperty: string = 'branch length';
   export let colorBranches: string = 'none';
   export let showLabels: boolean = true;
+  export let showScale: boolean = true;
+  export let isRadial: boolean = false;
   export let treeIndex: number = 0;
 
   let containerElement: HTMLDivElement;
   let phylotreeInstance: any = null;
   let loadingPhylotree = true;
+  let treeContainerId = `tree-container-${Math.random().toString(36).substr(2, 9)}`;
 
   async function loadPhylotreeLibrary() {
     try {
-      // Load phylotree CSS
+      // Load phylotree CSS - use the correct version
       const link = document.createElement('link');
       link.rel = 'stylesheet';
-      link.href = 'https://cdn.jsdelivr.net/npm/phylotree@0.1/phylotree.css';
+      link.href = 'https://cdn.jsdelivr.net/npm/phylotree@2.1.7/dist/phylotree.css';
       document.head.appendChild(link);
 
       // Import phylotree dynamically
@@ -67,35 +70,6 @@
     return branchAttrs || {};
   }
 
-  function setupBranchStyling(tree: any, data: any, treeIndex: number) {
-    if (!tree || colorBranches === 'none') return;
-
-    const branchAttributes = getBranchAttributes(data, treeIndex);
-    
-    if (colorBranches === 'branch length' && branchLengthProperty) {
-      // Color by branch lengths
-      const values = [];
-      tree.get_nodes().forEach((node: any) => {
-        const attrs = branchAttributes[node.data.name];
-        if (attrs && attrs[branchLengthProperty] !== undefined) {
-          values.push(attrs[branchLengthProperty]);
-        }
-      });
-      
-      if (values.length > 0) {
-        const colorScale = d3.scaleSequential(d3.interpolateViridis)
-          .domain(d3.extent(values));
-        
-        tree.style_edges((element: any, data: any) => {
-          const attrs = branchAttributes[data.target.data.name];
-          const value = attrs?.[branchLengthProperty];
-          if (value !== undefined) {
-            d3.select(element).style('stroke', colorScale(value));
-          }
-        });
-      }
-    }
-  }
 
   async function renderTree() {
     if (!containerElement || !data || loadingPhylotree) return;
@@ -109,49 +83,76 @@
       return;
     }
 
-    // Clear container
+    // Clear container and add div with ID for phylotree
     containerElement.innerHTML = '';
+    const treeDiv = document.createElement('div');
+    treeDiv.id = treeContainerId;
+    containerElement.appendChild(treeDiv);
     
     try {
-      // Create SVG
-      const svg = d3.select(containerElement)
-        .append('svg')
-        .attr('width', width)
-        .attr('height', height);
-
-      // Create phylotree instance
-      phylotreeInstance = phylotreeLib.phylotree(newick);
+      // Create phylotree instance using the constructor
+      phylotreeInstance = new phylotreeLib.phylotree(newick);
       
-      // Basic configuration
-      phylotreeInstance
-        .size([height - 40, width - 40])
-        .separation((a: any, b: any) => 1);
-
-      if (showLabels) {
-        phylotreeInstance.node_circle_size(0);
+      // Set branch length accessor if we have branch attributes
+      const branchAttrs = getBranchAttributes(data, treeIndex);
+      if (branchAttrs && Object.keys(branchAttrs).length > 0) {
+        phylotreeInstance.branch_length(function(node: any) {
+          if (node.data.name && branchAttrs[node.data.name]) {
+            return branchAttrs[node.data.name][branchLengthProperty] || node.data.attribute;
+          }
+          return node.data.attribute || 0;
+        });
       }
 
-      // Render tree
-      phylotreeInstance(svg.append('g').attr('transform', 'translate(20,20)'));
-      
+      // Render tree with options similar to hyphy-eye
+      const rendered = phylotreeInstance.render(`#${treeContainerId}`, {
+        'height': height - 40,
+        'width': width - 40,
+        'show-scale': showScale,
+        'is-radial': isRadial,
+        'left-right-spacing': 'fit-to-size',
+        'top-bottom-spacing': 'fit-to-size',
+        'node_circle_size': showLabels ? 0 : 3
+      });
+
       // Apply branch styling
-      setupBranchStyling(phylotreeInstance, data, treeIndex);
-      
-      // Add node labels if requested
+      if (colorBranches === 'branch length' && branchAttrs) {
+        const values = [];
+        Object.keys(branchAttrs).forEach(nodeName => {
+          const value = branchAttrs[nodeName][branchLengthProperty];
+          if (value !== undefined) values.push(value);
+        });
+
+        if (values.length > 0) {
+          const colorScale = d3.scaleSequential(d3.interpolateViridis)
+            .domain(d3.extent(values));
+
+          rendered.style_edges((element: any, data: any) => {
+            const targetName = data.target.data.name;
+            if (targetName && branchAttrs[targetName]) {
+              const value = branchAttrs[targetName][branchLengthProperty];
+              if (value !== undefined) {
+                d3.select(element).style('stroke', colorScale(value))
+                  .style('stroke-width', '2px');
+              }
+            }
+          });
+        }
+      }
+
+      // Style nodes and add labels
       if (showLabels) {
-        phylotreeInstance.style_nodes((element: any, data: any) => {
-          if (data.data.name && !data.children) {
-            d3.select(element.parentNode)
-              .append('text')
-              .attr('dx', 5)
-              .attr('dy', '0.35em')
-              .style('font-size', '12px')
-              .text(data.data.name);
+        rendered.style_nodes((element: any, data: any) => {
+          // Hide internal node circles when showing labels
+          if (data.children) {
+            d3.select(element).style('display', 'none');
           }
         });
       }
 
-      phylotreeInstance.layout();
+      // Update the tree layout
+      rendered.placenodes();
+      rendered.update();
 
     } catch (error) {
       console.error('Error rendering tree:', error);
@@ -206,6 +207,20 @@
         <label>
           <input type="checkbox" bind:checked={showLabels} />
           Show labels
+        </label>
+      </div>
+
+      <div class="control-group">
+        <label>
+          <input type="checkbox" bind:checked={showScale} />
+          Show scale
+        </label>
+      </div>
+
+      <div class="control-group">
+        <label>
+          <input type="checkbox" bind:checked={isRadial} />
+          Radial layout
         </label>
       </div>
     </div>
@@ -272,18 +287,30 @@
     padding: 2rem;
   }
 
-  :global(.phylotree-node) {
+  /* Phylotree specific styles */
+  :global(.node) {
     fill: #333;
+    stroke: #333;
   }
 
-  :global(.phylotree-branch) {
+  :global(.branch) {
     fill: none;
     stroke: #333;
     stroke-width: 1px;
   }
 
-  :global(.phylotree-node-text) {
-    font-size: 12px;
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  :global(.internal-node) {
+    fill: #666;
+    stroke: #666;
+  }
+
+  :global(.tree-scale-bar) {
+    stroke: #666;
+    stroke-width: 1px;
+  }
+
+  :global(.tree-scale-label) {
+    font-size: 10px;
+    fill: #666;
   }
 </style>

@@ -3,18 +3,20 @@ import { render, screen, waitFor } from '@testing-library/svelte';
 import PhylogeneticTreeViewer from './PhylogeneticTreeViewer.svelte';
 
 // Mock phylotree library
-const mockPhylotree = vi.fn(() => ({
-  size: vi.fn().mockReturnThis(),
-  separation: vi.fn().mockReturnThis(),
-  node_circle_size: vi.fn().mockReturnThis(),
+const mockRender = vi.fn(() => ({
   style_nodes: vi.fn().mockReturnThis(),
   style_edges: vi.fn().mockReturnThis(),
-  layout: vi.fn().mockReturnThis(),
-  get_nodes: vi.fn(() => [])
+  placenodes: vi.fn().mockReturnThis(),
+  update: vi.fn().mockReturnThis()
+}));
+
+const mockPhylotreeConstructor = vi.fn(() => ({
+  branch_length: vi.fn().mockReturnThis(),
+  render: mockRender
 }));
 
 vi.mock('phylotree', () => ({
-  default: mockPhylotree
+  phylotree: mockPhylotreeConstructor
 }));
 
 // Mock D3
