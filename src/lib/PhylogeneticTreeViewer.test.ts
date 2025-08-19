@@ -17,11 +17,9 @@ vi.mock('phylotree', () => {
 
   return {
     default: {
-      phylotree: mockPhylotreeConstructor,
-      newickParser: vi.fn((newick) => ({ newick: newick }))
+      phylotree: mockPhylotreeConstructor
     },
-    phylotree: mockPhylotreeConstructor,
-    newickParser: vi.fn((newick) => ({ newick: newick }))
+    phylotree: mockPhylotreeConstructor
   };
 });
 
