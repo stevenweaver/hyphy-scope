@@ -93,8 +93,8 @@
     const numberOfSites = Object.values(content)
       .reduce((sum, partition) => sum + (partition?.length || 0), 0);
     
-    // Estimate sequences from first partition if available
-    const numberOfSequences = 10; // Default fallback
+    // Extract sequence count from input data
+    const numberOfSequences = resultsJson.input?.["number of sequences"] || 10; // Default fallback
     const testedBranchCount = 5; // Default fallback
 
     return {
