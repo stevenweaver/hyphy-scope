@@ -25,7 +25,7 @@ const meta = {
     },
     colorBranches: {
       control: 'select',
-      options: ['none', 'branch length'],
+      options: ['none', 'branch length', 'bootstrap'],
       description: 'How to color tree branches'
     },
     showLabels: {
@@ -123,6 +123,19 @@ export const LargeTreeColoredBranches: Story = {
     height: 700,
     branchLengthProperty: 'dN/dS',
     colorBranches: 'branch length',
+    showLabels: true,
+    treeIndex: 0
+  }
+};
+
+// Tree with bootstrap value coloring
+export const BootstrapColoring: Story = {
+  args: {
+    data: phylotreeTestData,
+    width: 800,
+    height: 600,
+    branchLengthProperty: 'branch length',
+    colorBranches: 'bootstrap',
     showLabels: true,
     treeIndex: 0
   }

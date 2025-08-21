@@ -71,6 +71,52 @@
 		return branchAttrs || {};
 	}
 
+	function extractBootstrapValues(tree) {
+		const bootstrapValues = [];
+		
+		// Try to get nodes from phylotree
+		let nodes = [];
+		if (tree && typeof tree.get_nodes === 'function') {
+			nodes = tree.get_nodes();
+		} else if (tree && tree.nodes) {
+			nodes = tree.nodes();
+		}
+		
+		// Traverse all nodes to find bootstrap values
+		nodes.forEach((node) => {
+			// Check if this is an internal node (has children)
+			if (node?.children && node.children.length > 0) {
+				// Try to extract bootstrap value from all possible locations
+				let bootstrapValue = null;
+				
+				const possibleValues = [
+					node?.data?.annotation,
+					node?.data?.name,
+					node?.annotation,
+					node?.name,
+					node?.data?.label,
+					node?.label
+				];
+				
+				for (const val of possibleValues) {
+					if (val !== undefined && val !== null && val !== '' && !isNaN(parseFloat(val))) {
+						const parsed = parseFloat(val);
+						if (parsed >= 0 && parsed <= 100) {
+							bootstrapValue = parsed;
+							break;
+						}
+					}
+				}
+				
+				if (bootstrapValue !== null) {
+					bootstrapValues.push(bootstrapValue);
+				}
+			}
+		});
+		
+		return bootstrapValues;
+	}
+
 	// Node colorizer function that applies colors based on annotations/tags
 	function nodeColorizer(element, data) {
 		try {
@@ -177,6 +223,54 @@
 		};
 	}
 
+	// Bootstrap colorizer function for coloring by internal node bootstrap values
+	function createBootstrapColorizer(colorScale) {
+		return function(element, data) {
+			try {
+				// Only apply if bootstrap coloring is enabled
+				if (colorBranches !== 'bootstrap' || !colorScale) {
+					return;
+				}
+
+				// Get bootstrap value from the target node
+				// FastTree bootstrap values are typically stored in node labels or annotations
+				const targetNode = data.target;
+				let bootstrapValue = null;
+
+
+				// Try different ways to access bootstrap values
+				// Check all possible locations where phylotree might store bootstrap values
+				const possibleValues = [
+					targetNode?.data?.annotation,
+					targetNode?.data?.name,
+					targetNode?.annotation,
+					targetNode?.name,
+					targetNode?.data?.label,
+					targetNode?.label
+				];
+				
+				for (const val of possibleValues) {
+					if (val !== undefined && val !== null && val !== '' && !isNaN(parseFloat(val))) {
+						const parsed = parseFloat(val);
+						if (parsed >= 0 && parsed <= 100) {
+							bootstrapValue = parsed;
+							break;
+						}
+					}
+				}
+
+
+				// Only color if we have a valid bootstrap value and it's an internal node
+				if (bootstrapValue !== null && !isNaN(bootstrapValue) && targetNode?.children) {
+					element.style('stroke', colorScale(bootstrapValue));
+					element.style('stroke-width', '2px');
+				}
+			} catch (e) {
+				console.error('Error in bootstrapColorizer:', e);
+			}
+		};
+	}
+
 	function renderTree() {
 		try {
 			// Make sure we have a valid Newick string
@@ -222,7 +316,7 @@
 			console.error('Error in renderTree:', e);
 		}
 
-		// Prepare branch colorizer if needed
+		// Prepare colorizer if needed
 		let branchColorizer = null;
 		colorScale = null;
 		colorRange = null;
@@ -242,6 +336,19 @@
 						.domain(colorRange);
 					branchColorizer = createBranchColorizer(branchAttrs, colorScale);
 				}
+			}
+		} else if (colorBranches === 'bootstrap') {
+			// Extract bootstrap values from the tree after it's created
+			const bootstrapValues = extractBootstrapValues(tree);
+			
+			if (bootstrapValues.length > 0) {
+				// Use actual range of bootstrap values found
+				colorRange = d3.extent(bootstrapValues);
+				// Use a red-yellow-green scale for bootstrap values
+				// Red (low confidence) -> Yellow (medium) -> Green (high confidence)
+				colorScale = d3.scaleSequential(d3.interpolateRdYlGn)
+					.domain([0, 100]); // Bootstrap values are typically 0-100
+				branchColorizer = createBootstrapColorizer(colorScale);
 			}
 		}
 
@@ -326,6 +433,7 @@
 				<select id="color-branches" bind:value={colorBranches}>
 					<option value="none">None</option>
 					<option value="branch length">Branch length</option>
+					<option value="bootstrap">Bootstrap values</option>
 				</select>
 			</div>
 
@@ -351,14 +459,16 @@
 			</div>
 		</div>
 		
-		{#if colorScale && colorRange && colorBranches === 'branch length'}
+		{#if colorScale && colorRange && (colorBranches === 'branch length' || colorBranches === 'bootstrap')}
 			<div class="color-legend">
-				<span class="legend-title">{branchLengthProperty}:</span>
+				<span class="legend-title">
+					{colorBranches === 'bootstrap' ? 'Bootstrap values' : branchLengthProperty}:
+				</span>
 				<div class="legend-gradient">
-					<div class="gradient-bar"></div>
+					<div class="gradient-bar" class:bootstrap={colorBranches === 'bootstrap'}></div>
 					<div class="legend-labels">
-						<span class="min-label">{colorRange[0].toFixed(2)}</span>
-						<span class="max-label">{colorRange[1].toFixed(2)}</span>
+						<span class="min-label">{colorRange[0].toFixed(colorBranches === 'bootstrap' ? 0 : 2)}</span>
+						<span class="max-label">{colorRange[1].toFixed(colorBranches === 'bootstrap' ? 0 : 2)}</span>
 					</div>
 				</div>
 			</div>
@@ -452,6 +562,12 @@
 			#1f9d8a, #6cce5a, #b6de2b, #fee825, #f0f921);
 		border-radius: 2px;
 		border: 1px solid #ccc;
+	}
+
+	.gradient-bar.bootstrap {
+		background: linear-gradient(to right, 
+			#d73027, #f46d43, #fdae61, #fee08b, #ffffbf, 
+			#d9ef8b, #a6d96a, #66bd63, #1a9850);
 	}
 
 	.legend-labels {
