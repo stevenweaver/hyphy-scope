@@ -115,6 +115,19 @@ export const LargeTreeView: Story = {
   }
 };
 
+// Large tree with colored branches
+export const LargeTreeColoredBranches: Story = {
+  args: {
+    data: largePhylotreeTestData,
+    width: 1000,
+    height: 700,
+    branchLengthProperty: 'dN/dS',
+    colorBranches: 'branch length',
+    showLabels: true,
+    treeIndex: 0
+  }
+};
+
 // No data state
 export const NoData: Story = {
   args: {

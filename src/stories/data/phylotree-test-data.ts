@@ -69,6 +69,75 @@ export const largePhylotreeTestData = {
     }
   },
   "branch attributes": {
-    "0": {}
+    "0": {
+      "A": {
+        "branch length": 0.1,
+        "dN/dS": 0.45
+      },
+      "B": {
+        "branch length": 0.2,
+        "dN/dS": 1.8
+      },
+      "C": {
+        "branch length": 0.15,
+        "dN/dS": 0.92
+      },
+      "D": {
+        "branch length": 0.2,
+        "dN/dS": 1.34
+      },
+      "E": {
+        "branch length": 0.25,
+        "dN/dS": 2.1
+      },
+      "F": {
+        "branch length": 0.15,
+        "dN/dS": 0.67
+      },
+      "G": {
+        "branch length": 0.1,
+        "dN/dS": 0.23
+      },
+      "H": {
+        "branch length": 0.2,
+        "dN/dS": 1.56
+      },
+      "I": {
+        "branch length": 0.1,
+        "dN/dS": 0.78
+      },
+      "J": {
+        "branch length": 0.15,
+        "dN/dS": 1.23
+      },
+      "K": {
+        "branch length": 0.2,
+        "dN/dS": 1.89
+      },
+      "L": {
+        "branch length": 0.25,
+        "dN/dS": 2.34
+      },
+      "M": {
+        "branch length": 0.15,
+        "dN/dS": 0.56
+      },
+      "N": {
+        "branch length": 0.2,
+        "dN/dS": 1.45
+      },
+      "O": {
+        "branch length": 0.15,
+        "dN/dS": 0.89
+      },
+      "P": {
+        "branch length": 0.1,
+        "dN/dS": 0.34
+      },
+      "Q": {
+        "branch length": 0.25,
+        "dN/dS": 1.98
+      }
+    }
   }
 };

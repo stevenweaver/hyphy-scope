@@ -18,6 +18,8 @@
 	let renderedTree;
 	let selection_set = []; // For parsed tags
 	let current_selection_id = 0; // Current active selection index
+	let colorScale = null; // For branch coloring legend
+	let colorRange = null; // Min/max values for legend
 
 	// Color scheme for different tags
 	const color_scheme = d3.scaleOrdinal(d3.schemeCategory10);
@@ -106,7 +108,7 @@
 		}
 	}
 
-	// Edge colorizer function that applies colors based on annotations/tags
+	// Edge colorizer function that applies colors based on annotations/tags or branch attributes
 	function edgeColorizer(element, data) {
 		try {
 			let count_class = 0;
@@ -145,6 +147,34 @@
 		} catch (e) {
 			console.error('Error in edgeColorizer:', e);
 		}
+	}
+
+	// Branch colorizer function for coloring by branch length/attributes
+	function createBranchColorizer(branchAttrs, colorScale) {
+		return function(element, data) {
+			try {
+				// Only apply if colorBranches is enabled
+				if (colorBranches !== 'branch length' || !branchAttrs || !colorScale) {
+					return;
+				}
+
+				// Get target node name
+				const targetName = data.target?.data?.name;
+				if (!targetName || !branchAttrs[targetName]) {
+					return;
+				}
+
+				const value = branchAttrs[targetName][branchLengthProperty];
+				if (value === undefined || value === null) {
+					return;
+				}
+
+				element.style('stroke', colorScale(value));
+				element.style('stroke-width', '2px');
+			} catch (e) {
+				console.error('Error in branchColorizer:', e);
+			}
+		};
 	}
 
 	function renderTree() {
@@ -192,6 +222,41 @@
 			console.error('Error in renderTree:', e);
 		}
 
+		// Prepare branch colorizer if needed
+		let branchColorizer = null;
+		colorScale = null;
+		colorRange = null;
+		
+		if (colorBranches === 'branch length') {
+			const branchAttrs = getBranchAttributes(data, treeIndex);
+			if (branchAttrs && Object.keys(branchAttrs).length > 0) {
+				const values = [];
+				Object.keys(branchAttrs).forEach(nodeName => {
+					const value = branchAttrs[nodeName][branchLengthProperty];
+					if (value !== undefined) values.push(value);
+				});
+
+				if (values.length > 0) {
+					colorRange = d3.extent(values);
+					colorScale = d3.scaleSequential(d3.interpolateViridis)
+						.domain(colorRange);
+					branchColorizer = createBranchColorizer(branchAttrs, colorScale);
+				}
+			}
+		}
+
+		// Combined edge styler function
+		function combinedEdgeStyler(element, data) {
+			// First apply the branch colorizer for branch length coloring
+			if (branchColorizer) {
+				branchColorizer(element, data);
+			}
+			// Then apply the edge colorizer for tag-based coloring (only if no branch coloring applied)
+			if (!branchColorizer || colorBranches !== 'branch length') {
+				edgeColorizer(element, data);
+			}
+		}
+
 		// Render the tree with colorizers
 		renderedTree = tree.render({
 			container: '.tree-container',
@@ -207,36 +272,8 @@
 			reroot: false,
 			hide: false,
 			'node-styler': nodeColorizer,
-			'edge-styler': edgeColorizer
+			'edge-styler': combinedEdgeStyler
 		});
-
-		// Apply branch styling for color branches
-		if (colorBranches === 'branch length') {
-			const branchAttrs = getBranchAttributes(data, treeIndex);
-			if (branchAttrs && Object.keys(branchAttrs).length > 0) {
-				const values = [];
-				Object.keys(branchAttrs).forEach(nodeName => {
-					const value = branchAttrs[nodeName][branchLengthProperty];
-					if (value !== undefined) values.push(value);
-				});
-
-				if (values.length > 0) {
-					const colorScale = d3.scaleSequential(d3.interpolateViridis)
-						.domain(d3.extent(values));
-
-					renderedTree.style_edges((element, data) => {
-						const targetName = data.target.data.name;
-						if (targetName && branchAttrs[targetName]) {
-							const value = branchAttrs[targetName][branchLengthProperty];
-							if (value !== undefined) {
-								d3.select(element).style('stroke', colorScale(value))
-									.style('stroke-width', '2px');
-							}
-						}
-					});
-				}
-			}
-		}
 
 		// Style nodes and add labels
 		if (showLabels) {
@@ -314,6 +351,19 @@
 			</div>
 		</div>
 		
+		{#if colorScale && colorRange && colorBranches === 'branch length'}
+			<div class="color-legend">
+				<span class="legend-title">{branchLengthProperty}:</span>
+				<div class="legend-gradient">
+					<div class="gradient-bar"></div>
+					<div class="legend-labels">
+						<span class="min-label">{colorRange[0].toFixed(2)}</span>
+						<span class="max-label">{colorRange[1].toFixed(2)}</span>
+					</div>
+				</div>
+			</div>
+		{/if}
+		
 		<div bind:this={treeContainer} class="tree-container"></div>
 	{/if}
 </div>
@@ -368,6 +418,48 @@
 		background: #fff;
 		overflow: auto;
 		min-height: 400px;
+	}
+
+	.color-legend {
+		display: flex;
+		align-items: center;
+		gap: 0.75rem;
+		margin-bottom: 1rem;
+		padding: 0.5rem;
+		background: #f8f9fa;
+		border-radius: 4px;
+		border: 1px solid #ddd;
+		font-size: 0.85rem;
+	}
+
+	.legend-title {
+		font-weight: 500;
+		color: #333;
+		white-space: nowrap;
+	}
+
+	.legend-gradient {
+		display: flex;
+		flex-direction: column;
+		gap: 0.1rem;
+		min-width: 120px;
+	}
+
+	.gradient-bar {
+		height: 12px;
+		background: linear-gradient(to right, 
+			#440154, #482777, #3f4a8a, #31678e, #26838f, 
+			#1f9d8a, #6cce5a, #b6de2b, #fee825, #f0f921);
+		border-radius: 2px;
+		border: 1px solid #ccc;
+	}
+
+	.legend-labels {
+		display: flex;
+		justify-content: space-between;
+		font-size: 0.7rem;
+		color: #666;
+		line-height: 1;
 	}
 
 	.error {
