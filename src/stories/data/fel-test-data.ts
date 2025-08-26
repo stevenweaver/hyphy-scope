@@ -45,7 +45,12 @@ export const felTestData = {
     "file name": "sample.fas",
     "number of sequences": 8,
     "number of sites": 10,
-    "partition count": 1
+    "partition count": 1,
+    "trees": {
+      "Original tree": "(Cow:0.11,((Raccoon:0.08,Bear:0.05):0.03,(((Monkey:0.02,Cat:0.03):0.01,Weasel:0.04):0.02,(Dog:0.05,Seal:0.06):0.01):0.02):0.01,Horse:0.08);",
+      "Alternative topology": "((Cow:0.10,Horse:0.08):0.02,(Raccoon:0.08,(Bear:0.05,((Monkey:0.02,Cat:0.03):0.01,(Weasel:0.04,(Dog:0.05,Seal:0.06):0.01):0.02):0.02):0.03):0.01);",
+      "Rerooted tree": "(Horse:0.08,(Cow:0.11,((Raccoon:0.08,Bear:0.05):0.03,(((Monkey:0.02,Cat:0.03):0.01,Weasel:0.04):0.02,(Dog:0.05,Seal:0.06):0.01):0.02):0.01):0.00);"
+    }
   },
   "test results": {
     "P-value threshold": 0.1,

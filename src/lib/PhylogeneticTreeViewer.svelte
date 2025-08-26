@@ -28,6 +28,9 @@
 
 	const dispatch = createEventDispatcher();
 
+	// Get available trees
+	$: availableTrees = getAvailableTrees(data);
+
 	// Force re-render when colorScale or colorRange changes
 	$: legendVisible = !!(
 		colorScale &&
@@ -41,7 +44,7 @@
 
 	afterUpdate(() => {
 		const newick = getTreeNewick(data, treeIndex);
-		const currentDataKey = `${JSON.stringify(data)}-${treeIndex}-${colorBranches}-${branchLengthProperty}`;
+		const currentDataKey = `${JSON.stringify(data)}-${treeIndex}-${colorBranches}-${branchLengthProperty}-${width}-${height}`;
 
 		if (
 			newick &&
@@ -70,6 +73,34 @@
 		}
 
 		return null;
+	}
+
+	function getAvailableTrees(data) {
+		if (!data?.input?.trees) return [];
+
+		const trees = data.input.trees;
+
+		if (Array.isArray(trees)) {
+			// For array format, return indices with labels
+			return trees.map((_, index) => ({
+				value: index,
+				label: `Tree ${index + 1}`
+			}));
+		} else if (typeof trees === "object") {
+			// For object format, use the keys as labels
+			return Object.keys(trees).map((key, index) => ({
+				value: index,
+				label: key
+			}));
+		} else if (typeof trees === "string") {
+			// Single tree
+			return [{
+				value: 0,
+				label: "Tree 1"
+			}];
+		}
+
+		return [];
 	}
 
 	function getBranchAttributes(data, treeIndex = 0) {
@@ -267,7 +298,7 @@
 		}
 
 		isRendering = true;
-		const currentDataKey = `${JSON.stringify(data)}-${treeIndex}-${colorBranches}-${branchLengthProperty}`;
+		const currentDataKey = `${JSON.stringify(data)}-${treeIndex}-${colorBranches}-${branchLengthProperty}-${width}-${height}`;
 
 		try {
 			// Make sure we have a valid Newick string
@@ -426,16 +457,16 @@
 		<div class="loading">No tree data provided</div>
 	{:else}
 		<div class="controls">
-			<div class="control-group">
-				<label for="tree-index">Tree:</label>
-				<input
-					id="tree-index"
-					type="number"
-					bind:value={treeIndex}
-					min="0"
-					max="10"
-				/>
-			</div>
+			{#if availableTrees.length > 1}
+				<div class="control-group">
+					<label for="tree-select">Tree:</label>
+					<select id="tree-select" bind:value={treeIndex}>
+						{#each availableTrees as tree}
+							<option value={tree.value}>{tree.label}</option>
+						{/each}
+					</select>
+				</div>
+			{/if}
 
 			<div class="control-group">
 				<label for="color-branches">Color branches:</label>
