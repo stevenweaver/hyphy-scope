@@ -41,7 +41,7 @@
 
 	afterUpdate(() => {
 		const newick = getTreeNewick(data, treeIndex);
-		const currentDataKey = `${JSON.stringify(data)}-${treeIndex}-${colorBranches}-${branchLengthProperty}`;
+		const currentDataKey = `${JSON.stringify(data)}-${treeIndex}-${colorBranches}-${branchLengthProperty}-${width}-${height}`;
 
 		if (
 			newick &&
@@ -267,7 +267,7 @@
 		}
 
 		isRendering = true;
-		const currentDataKey = `${JSON.stringify(data)}-${treeIndex}-${colorBranches}-${branchLengthProperty}`;
+		const currentDataKey = `${JSON.stringify(data)}-${treeIndex}-${colorBranches}-${branchLengthProperty}-${width}-${height}`;
 
 		try {
 			// Make sure we have a valid Newick string
