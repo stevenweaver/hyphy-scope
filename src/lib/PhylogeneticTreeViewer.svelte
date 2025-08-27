@@ -44,7 +44,7 @@
 
 	afterUpdate(() => {
 		const newick = getTreeNewick(data, treeIndex);
-		const currentDataKey = `${JSON.stringify(data)}-${treeIndex}-${colorBranches}-${branchLengthProperty}-${width}-${height}`;
+		const currentDataKey = `${JSON.stringify(data)}-${treeIndex}-${colorBranches}-${branchLengthProperty}-${width}-${height}-${isRadial}-${showLabels}-${showScale}`;
 
 		if (
 			newick &&
@@ -298,7 +298,7 @@
 		}
 
 		isRendering = true;
-		const currentDataKey = `${JSON.stringify(data)}-${treeIndex}-${colorBranches}-${branchLengthProperty}-${width}-${height}`;
+		const currentDataKey = `${JSON.stringify(data)}-${treeIndex}-${colorBranches}-${branchLengthProperty}-${width}-${height}-${isRadial}-${showLabels}-${showScale}`;
 
 		try {
 			// Make sure we have a valid Newick string
@@ -597,6 +597,9 @@
 		background: #fff;
 		overflow: auto;
 		min-height: 400px;
+		display: flex;
+		align-items: center;
+		justify-content: center;
 	}
 
 	.color-legend {
