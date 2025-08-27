@@ -5,9 +5,13 @@ import { getTestData } from './data-loader';
 const mockFetch = vi.fn();
 global.fetch = mockFetch;
 
+// Mock console.error to suppress expected error messages in tests
+const mockConsoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+
 describe('Data Loader', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockConsoleError.mockClear();
   });
 
   it('fetches FEL test data successfully', async () => {

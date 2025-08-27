@@ -88,7 +88,7 @@ describe('PhylogeneticTreeViewer', () => {
 
   it('renders controls when data is provided', () => {
     render(PhylogeneticTreeViewer, { data: sampleTreeData });
-    expect(screen.getByLabelText('Tree:')).toBeInTheDocument();
+    expect(screen.getByLabelText('Color branches:')).toBeInTheDocument();
   });
 
   it('accepts tree configuration props', () => {
@@ -152,7 +152,7 @@ describe('PhylogeneticTreeViewer Data Parsing', () => {
     };
     
     render(PhylogeneticTreeViewer, { data: stringTreeData });
-    expect(screen.getByLabelText('Tree:')).toBeInTheDocument();
+    expect(screen.getByLabelText('Color branches:')).toBeInTheDocument();
   });
 
   it('handles missing tree data gracefully', () => {
@@ -161,6 +161,6 @@ describe('PhylogeneticTreeViewer Data Parsing', () => {
     };
     
     render(PhylogeneticTreeViewer, { data: noTreeData });
-    expect(screen.getByLabelText('Tree:')).toBeInTheDocument();
+    expect(screen.getByText('No tree data found')).toBeInTheDocument();
   });
 });
