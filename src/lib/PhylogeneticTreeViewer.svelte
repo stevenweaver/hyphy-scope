@@ -8,7 +8,6 @@
 	export let width = 800;
 	export let branchLengthProperty = "branch length";
 	export let colorBranches = "none";
-	export let showLabels = true;
 	export let showScale = true;
 	export let isRadial = false;
 	export let treeIndex = 0;
@@ -44,7 +43,7 @@
 
 	afterUpdate(() => {
 		const newick = getTreeNewick(data, treeIndex);
-		const currentDataKey = `${JSON.stringify(data)}-${treeIndex}-${colorBranches}-${branchLengthProperty}-${width}-${height}-${isRadial}-${showLabels}-${showScale}`;
+		const currentDataKey = `${JSON.stringify(data)}-${treeIndex}-${colorBranches}-${branchLengthProperty}-${width}-${height}-${isRadial}-${showScale}`;
 
 		if (
 			newick &&
@@ -298,7 +297,7 @@
 		}
 
 		isRendering = true;
-		const currentDataKey = `${JSON.stringify(data)}-${treeIndex}-${colorBranches}-${branchLengthProperty}-${width}-${height}-${isRadial}-${showLabels}-${showScale}`;
+		const currentDataKey = `${JSON.stringify(data)}-${treeIndex}-${colorBranches}-${branchLengthProperty}-${width}-${height}-${isRadial}-${showScale}`;
 
 		try {
 			// Make sure we have a valid Newick string
@@ -396,15 +395,6 @@
 			"edge-styler": combinedEdgeStyler,
 		});
 
-		// Style nodes and add labels
-		if (showLabels) {
-			renderedTree.style_nodes((element, data) => {
-				// Hide internal node circles when showing labels
-				if (data.children) {
-					d3.select(element).style("display", "none");
-				}
-			});
-		}
 
 		// Clear the container and append the SVG element
 		treeContainer.innerHTML = "";
@@ -477,12 +467,6 @@
 				</select>
 			</div>
 
-			<div class="control-group">
-				<label>
-					<input type="checkbox" bind:checked={showLabels} />
-					Show labels
-				</label>
-			</div>
 
 			<div class="control-group">
 				<label>

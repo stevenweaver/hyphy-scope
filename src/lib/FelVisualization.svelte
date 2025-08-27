@@ -490,7 +490,6 @@
         height={treeHeight}
         branchLengthProperty="branch length"
         colorBranches="none"
-        showLabels={true}
         showScale={true}
         isRadial={false}
         treeIndex={0}
