@@ -251,7 +251,6 @@
         width={treeWidth} 
         height={treeHeight}
         branchLengthProperty="branch length"
-        colorBranches="none"
         showScale={true}
         isRadial={false}
         treeIndex={0}
