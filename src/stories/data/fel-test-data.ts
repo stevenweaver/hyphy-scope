@@ -52,6 +52,46 @@ export const felTestData = {
       "Rerooted tree": "(Horse:0.08,(Cow:0.11,((Raccoon:0.08,Bear:0.05):0.03,(((Monkey:0.02,Cat:0.03):0.01,Weasel:0.04):0.02,(Dog:0.05,Seal:0.06):0.01):0.02):0.01):0.00);"
     }
   },
+  "branch attributes": {
+    "0": {
+      "Cow": {
+        "omega": 0.8,
+        "branch length": 0.11
+      },
+      "Raccoon": {
+        "omega": 1.2,
+        "branch length": 0.08
+      },
+      "Bear": {
+        "omega": 0.6,
+        "branch length": 0.05
+      },
+      "Monkey": {
+        "omega": 2.1,
+        "branch length": 0.02
+      },
+      "Cat": {
+        "omega": 0.9,
+        "branch length": 0.03
+      },
+      "Weasel": {
+        "omega": 1.5,
+        "branch length": 0.04
+      },
+      "Dog": {
+        "omega": 0.7,
+        "branch length": 0.05
+      },
+      "Seal": {
+        "omega": 1.8,
+        "branch length": 0.06
+      },
+      "Horse": {
+        "omega": 0.4,
+        "branch length": 0.08
+      }
+    }
+  },
   "test results": {
     "P-value threshold": 0.1,
     "tested": 10,

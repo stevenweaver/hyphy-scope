@@ -48,6 +48,46 @@ export const memeTestData = {
     "partition count": 1,
     "trees": "(Cow:0.11,((Raccoon:0.08,Bear:0.05):0.03,(((Monkey:0.02,Cat:0.03):0.01,Weasel:0.04):0.02,(Dog:0.05,Seal:0.06):0.01):0.02):0.01,Horse:0.08);"
   },
+  "branch attributes": {
+    "0": {
+      "Cow": {
+        "omega": 1.1,
+        "branch length": 0.11
+      },
+      "Raccoon": {
+        "omega": 0.9,
+        "branch length": 0.08
+      },
+      "Bear": {
+        "omega": 1.4,
+        "branch length": 0.05
+      },
+      "Monkey": {
+        "omega": 0.5,
+        "branch length": 0.02
+      },
+      "Cat": {
+        "omega": 2.3,
+        "branch length": 0.03
+      },
+      "Weasel": {
+        "omega": 0.8,
+        "branch length": 0.04
+      },
+      "Dog": {
+        "omega": 1.7,
+        "branch length": 0.05
+      },
+      "Seal": {
+        "omega": 0.6,
+        "branch length": 0.06
+      },
+      "Horse": {
+        "omega": 1.9,
+        "branch length": 0.08
+      }
+    }
+  },
   "test results": {
     "P-value threshold": 0.1,
     "tested": 10,
