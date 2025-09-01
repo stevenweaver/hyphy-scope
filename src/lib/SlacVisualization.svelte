@@ -75,6 +75,7 @@
     const mleData = data.MLE?.content?.['0']?.['by-site']?.AVERAGED || data.MLE?.content?.['0'] || [];
     const pThreshold = 0.1;
     
+    
     let significantSites = 0;
     let positivelySelected = 0;
     let negativelySelected = 0;
@@ -92,8 +93,23 @@
       }
     });
 
+    // Try different possible locations for sequence count
+    let sequenceCount = 0;
+    if (data.input) {
+      sequenceCount = data.input['number of sequences'] || 
+                     data.input.sequences || 
+                     data.input.numberofsequences ||
+                     data.input['sequences'] ||
+                     0;
+    }
+    
+    // If still 0, try to infer from other data structures
+    if (sequenceCount === 0 && data.tested?.['0']) {
+      sequenceCount = Object.keys(data.tested['0']).length;
+    }
+    
     return {
-      sequences: data.input?.['number of sequences'] || data.input?.sequences || 0,
+      sequences: sequenceCount,
       sites: mleData.length,
       partitions: Object.keys(data['data partitions'] || {}).length,
       testedSites: mleData.length,
