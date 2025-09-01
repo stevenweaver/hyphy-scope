@@ -72,7 +72,7 @@
 
   // Utility Functions
   function getSlacSummary(data: any): SlacSummary {
-    const mleData = data.MLE?.content?.['0'] || [];
+    const mleData = data.MLE?.content?.['0']?.['by-site']?.AVERAGED || data.MLE?.content?.['0'] || [];
     const pThreshold = 0.1;
     
     let significantSites = 0;
@@ -80,8 +80,10 @@
     let negativelySelected = 0;
 
     mleData.forEach((site: any) => {
-      const pValue = site[4] || 1; // p-value is typically the 5th column
-      const dnds = site[3] || 0;   // dN/dS is typically the 4th column
+      const dS = site[5] || 0;     // dS rate
+      const dN = site[6] || 0;     // dN rate  
+      const dnds = dS > 0 ? dN / dS : 0; // Calculate dN/dS ratio
+      const pValue = site[8] || 1; // P[dN/dS > 1] probability
       
       if (pValue <= pThreshold) {
         significantSites++;
@@ -91,7 +93,7 @@
     });
 
     return {
-      sequences: data.input?.sequences || 0,
+      sequences: data.input?.['number of sequences'] || data.input?.sequences || 0,
       sites: mleData.length,
       partitions: Object.keys(data['data partitions'] || {}).length,
       testedSites: mleData.length,
@@ -103,15 +105,15 @@
   }
 
   function getSlacSiteData(data: any): SlacSiteData[] {
-    const mleData = data.MLE?.content?.['0'] || [];
+    const mleData = data.MLE?.content?.['0']?.['by-site']?.AVERAGED || data.MLE?.content?.['0'] || [];
     const partitions = data['data partitions'] || {};
     
     return mleData.map((site: any, index: number) => {
-      const dN = site[0] || 0;
-      const dS = site[1] || 0;
-      const dnds = site[3] || 0;
-      const pValue = site[4] || 1;
-      const normalizedDiff = (site[5] !== undefined) ? site[5] : (dN - dS);
+      const dN = site[6] || 0;     // dN rate
+      const dS = site[5] || 0;     // dS rate
+      const dnds = dS > 0 ? dN / dS : 0; // Calculate dN/dS ratio
+      const pValue = site[8] || 1; // P[dN/dS > 1] probability  
+      const normalizedDiff = site[7] || (dN - dS); // dN-dS scaled value
 
       return {
         site: index + 1,
