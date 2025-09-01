@@ -1,6 +1,6 @@
 {
   "name": "hyphy-scope",
-  "version": "1.2.10",
+  "version": "1.2.11",
   "description": "Reusable Svelte components for HyPhy analysis visualization",
   "author": "Steven Weaver",
   "license": "MIT",
