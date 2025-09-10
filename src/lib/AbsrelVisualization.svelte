@@ -420,15 +420,34 @@
     const xScale = (site: number) => margin.left + (site - startSite) * cellSize;
     const yScale = (branchIndex: number) => margin.top + branchIndex * cellSize;
 
-    // Subtle blue-gray color scale for evidence strength
+    // Colorblind-friendly gradient for evidence strength
     const maxER = Math.max(...plotData.map(d => d.ER), 1);
     const colorScale = (er: number) => {
       const intensity = Math.min(er / maxER, 1);
-      // Subtle blue-gray gradient: light blue-gray to deeper blue-gray
-      const r = Math.round(240 - intensity * 40); // 240 to 200
-      const g = Math.round(245 - intensity * 45); // 245 to 200  
-      const b = Math.round(250 - intensity * 50); // 250 to 200
-      return `rgb(${r}, ${g}, ${b})`;
+      
+      // Interpolate between colorblind-friendly colors
+      if (intensity <= 0.33) {
+        // Blue to Yellow
+        const t = intensity / 0.33;
+        const r = Math.round(86 + (240 - 86) * t);   // #56B4E9 to #F0E442
+        const g = Math.round(180 + (228 - 180) * t);
+        const b = Math.round(233 + (66 - 233) * t);
+        return `rgb(${r}, ${g}, ${b})`;
+      } else if (intensity <= 0.66) {
+        // Yellow to Orange  
+        const t = (intensity - 0.33) / 0.33;
+        const r = Math.round(240 + (230 - 240) * t); // #F0E442 to #E69F00
+        const g = Math.round(228 + (159 - 228) * t);
+        const b = Math.round(66 + (0 - 66) * t);
+        return `rgb(${r}, ${g}, ${b})`;
+      } else {
+        // Orange to Purple
+        const t = (intensity - 0.66) / 0.34;
+        const r = Math.round(230 + (204 - 230) * t); // #E69F00 to #CC79A7
+        const g = Math.round(159 + (121 - 159) * t);
+        const b = Math.round(0 + (167 - 0) * t);
+        return `rgb(${r}, ${g}, ${b})`;
+      }
     };
 
     // Branch labels (minimal)
@@ -537,11 +556,11 @@
     colorScale.style.alignItems = 'center';
     colorScale.style.gap = '8px';
     
-    // Create gradient bar
+    // Create colorblind-friendly gradient bar
     const gradientBar = document.createElement('div');
     gradientBar.style.width = '100px';
     gradientBar.style.height = '12px';
-    gradientBar.style.background = 'linear-gradient(to right, rgb(240,245,250), rgb(200,200,200))';
+    gradientBar.style.background = 'linear-gradient(to right, #56B4E9, #F0E442, #E69F00, #CC79A7)';
     gradientBar.style.border = '1px solid #ddd';
     gradientBar.style.borderRadius = '2px';
     colorScale.appendChild(gradientBar);
