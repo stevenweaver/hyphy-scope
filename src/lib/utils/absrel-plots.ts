@@ -251,22 +251,24 @@ export function createSiteLogLikelihoodPlot(
 /**
  * Create model comparison plot
  */
-export function createModelComparisonPlot(results: AbsrelResults): any {
-  const baseline = results.fits['Baseline model'];
-  const fullModel = results.fits['Full adaptive model'];
+export function createModelComparisonPlot(results: AbsrelResults | any): any {
+  const baseline = results.fits?.['Baseline model'];
+  const fullModel = results.fits?.['Full adaptive model'];
+  
+  if (!baseline || !fullModel) return null;
   
   const plotData = [
     {
       model: "Baseline",
-      logLikelihood: baseline['log-likelihood'],
-      AIC: baseline.AIC,
-      parameters: baseline.parameters
+      logLikelihood: baseline['log-likelihood'] || 0,
+      AIC: baseline.AIC || 0,
+      parameters: baseline.parameters || 0
     },
     {
       model: "Full Adaptive", 
-      logLikelihood: fullModel['log-likelihood'],
-      AIC: fullModel.AIC,
-      parameters: fullModel.parameters
+      logLikelihood: fullModel['log-likelihood'] || 0,
+      AIC: fullModel.AIC || 0,
+      parameters: fullModel.parameters || 0
     }
   ];
 
@@ -305,4 +307,269 @@ function getEvidenceLevel(bayesFactor: number): string {
   if (bayesFactor >= 3) return "Substantial";
   if (bayesFactor >= 1) return "Weak";
   return "No Evidence";
+}
+
+/**
+ * Create synonymous rates bead plot
+ */
+export function createSynonymousRatesPlot(
+  siteData: any[],
+  startSite: number = 1,
+  sitesToShow: number = 70,
+  dynamicRangeCap: number = 10000
+): any {
+  if (!siteData.length) return null;
+
+  const endSite = Math.min(startSite + sitesToShow - 1, siteData.length);
+  const plotData = siteData
+    .slice(startSite - 1, endSite)
+    .map((site, index) => ({
+      site: startSite + index,
+      rate: Math.min(site['SRV posterior mean'] || 0, dynamicRangeCap),
+      codon: site.Codon || (startSite + index)
+    }));
+
+  return Plot.plot({
+    title: `Synonymous Rates (Sites ${startSite}-${endSite})`,
+    subtitle: "Posterior means for synonymous site-level substitution rates (α)",
+    width: 800,
+    height: 150,
+    marginLeft: 60,
+    marginBottom: 40,
+    x: {
+      label: "Site",
+      domain: [startSite, endSite]
+    },
+    y: {
+      label: "Synonymous Rate (α)",
+      grid: true
+    },
+    color: {
+      scheme: "viridis",
+      legend: true
+    },
+    marks: [
+      Plot.dot(plotData, {
+        x: "site",
+        y: "rate", 
+        fill: "rate",
+        r: 4,
+        title: d => `Site ${d.site}\nRate: ${d.rate.toFixed(3)}`
+      })
+    ]
+  });
+}
+
+/**
+ * Create support for positive selection heatmap
+ */
+export function createPositiveSelectionHeatmap(
+  branchSiteData: any[],
+  startSite: number = 1,
+  sitesToShow: number,
+  branchOrder: string[],
+  sizeField: string = "subs",
+  colorField: string = "EBF"
+): any {
+  if (!branchSiteData.length || !branchOrder.length) return null;
+
+  const endSite = startSite + sitesToShow - 1;
+  const plotData = branchSiteData
+    .filter(d => {
+      const site = parseInt(d.Key.split('|')[1]);
+      return site >= startSite && site <= endSite && branchOrder.includes(d.branch);
+    })
+    .map(d => ({
+      ...d,
+      site: parseInt(d.Key.split('|')[1]),
+      branchIndex: branchOrder.indexOf(d.branch),
+      logEBF: Math.log10(Math.max(d[colorField] || 1, 1))
+    }));
+
+  const maxSize = Math.max(...plotData.map(d => d[sizeField] || 1));
+
+  return Plot.plot({
+    title: `Support for Positive Selection (Sites ${startSite}-${endSite})`,
+    subtitle: `Empirical Bayes Factors for ω>1. Circle size: ${sizeField}`,
+    width: Math.max(600, sitesToShow * 10),
+    height: Math.max(200, branchOrder.length * 25),
+    marginLeft: 100,
+    marginBottom: 40,
+    x: {
+      label: "Site",
+      domain: [startSite, endSite],
+      ticks: Math.min(10, sitesToShow)
+    },
+    y: {
+      type: "band",
+      domain: branchOrder,
+      label: "Branch"
+    },
+    color: {
+      scheme: "reds",
+      legend: true,
+      label: "log₁₀(EBF)"
+    },
+    marks: [
+      Plot.dot(plotData, {
+        x: "site",
+        y: "branch",
+        fill: "logEBF",
+        r: d => Math.sqrt(d[sizeField] / maxSize) * 8 + 2,
+        title: d => `${d.branch} | Site ${d.site}\nEBF: ${(d[colorField] || 1).toFixed(2)}\n${sizeField}: ${d[sizeField] || 0}`
+      })
+    ]
+  });
+}
+
+/**
+ * Create evidence ratio alignment profile heatmap
+ */
+export function createEvidenceRatioProfilePlot(
+  profileBranchSites: any[],
+  startSite: number = 1,
+  sitesToShow: number,
+  branchOrder: string[],
+  sizeField: string = "subs"
+): any {
+  if (!profileBranchSites.length || !branchOrder.length) return null;
+
+  const endSite = startSite + sitesToShow - 1;
+  const plotData = profileBranchSites
+    .filter(d => {
+      return d.site >= startSite && d.site <= endSite && branchOrder.includes(d.branch);
+    })
+    .map(d => ({
+      ...d,
+      branchIndex: branchOrder.indexOf(d.branch),
+      logER: Math.log10(Math.max(d.ER, 1))
+    }));
+
+  const maxSize = Math.max(...plotData.map(d => d[sizeField] || 1));
+
+  return Plot.plot({
+    title: `Evidence Ratio Alignment Profile (Sites ${startSite}-${endSite})`,
+    subtitle: `Evidence ratios for ω>1. Circle size: ${sizeField}`,
+    width: Math.max(600, sitesToShow * 10),
+    height: Math.max(200, branchOrder.length * 25),
+    marginLeft: 100,
+    marginBottom: 40,
+    x: {
+      label: "Site",
+      domain: [startSite, endSite],
+      ticks: Math.min(10, sitesToShow)
+    },
+    y: {
+      type: "band",
+      domain: branchOrder,
+      label: "Branch"
+    },
+    color: {
+      scheme: "blues",
+      legend: true,
+      label: "log₁₀(ER)"
+    },
+    marks: [
+      Plot.dot(plotData, {
+        x: "site",
+        y: "branch",
+        fill: "logER",
+        r: d => Math.sqrt(d[sizeField] / maxSize) * 8 + 2,
+        title: d => `${d.branch} | Site ${d.site}\nER: ${d.ER.toFixed(2)}\n${sizeField}: ${d[sizeField] || 0}\nFrom: ${d.from} → To: ${d.to}`
+      })
+    ]
+  });
+}
+
+/**
+ * Get plot description for a given plot type
+ */
+export function getAbsrelPlotDescription(plotType: string): string {
+  const descriptions: {[key: string]: string} = {
+    "Synonymous rates": "Posterior means for synonymous site-level substitution rates (α).",
+    "Support for positive selection": "Empirical Bayes Factors for ω>1 at a particular branch and site (only tested branches with 2 or more rate classes are included).",
+    "Evidence ratio alignment profile": "Evidence ratios for ω>1 at a particular branch and site (only tested branches with an ω>1 distribution component are included). Mouse over for more information"
+  };
+
+  return descriptions[plotType] || "";
+}
+
+/**
+ * Get available plot options based on data availability
+ */
+export function getAbsrelPlotOptions(
+  srvRateClasses: number,
+  srvDistribution: any,
+  bsPositiveSelection: any[],
+  profileBranchSites: any[]
+): Array<[string, (data: any) => boolean]> {
+  return [
+    ["Synonymous rates", () => srvRateClasses > 0 && !!srvDistribution],
+    ["Support for positive selection", () => bsPositiveSelection.length > 0],
+    ["Evidence ratio alignment profile", () => profileBranchSites.length > 0]
+  ];
+}
+
+/**
+ * Get plot specification based on plot type and data
+ */
+export function getAbsrelPlotSpec(
+  plotType: string,
+  resultsJson: any,
+  fig1data: any[],
+  bsPositiveSelection: any[],
+  profileBranchSites: any[],
+  branchOrder: string[],
+  fig1Controls: string,
+  startSite: number = 1,
+  sitesToShow: number = 70
+): any {
+  let sizeField = "subs";
+  switch (fig1Controls) {
+    case "Syn subs":
+      sizeField = "syn_subs";
+      break;
+    case "Nonsyn subs":
+      sizeField = "nonsyn_subs";
+      break;
+  }
+
+  switch (plotType) {
+    case "Synonymous rates":
+      return createSynonymousRatesPlot(fig1data, startSite, sitesToShow);
+      
+    case "Support for positive selection":
+      return createPositiveSelectionHeatmap(
+        bsPositiveSelection,
+        startSite,
+        sitesToShow,
+        branchOrder,
+        sizeField,
+        "EBF"
+      );
+      
+    case "Evidence ratio alignment profile":
+      return createEvidenceRatioProfilePlot(
+        profileBranchSites,
+        startSite,
+        sitesToShow,
+        branchOrder,
+        sizeField
+      );
+      
+    default:
+      return null;
+  }
+}
+
+/**
+ * Calculate appropriate step size for evidence ratio plots
+ */
+export function calculateERStepSize(resultsJson: any): number {
+  const numSites = resultsJson.input?.["number of sites"] || 100;
+  
+  if (numSites <= 70) return numSites;
+  if (numSites <= 300) return 70;
+  if (numSites <= 1000) return 100;
+  return 150;
 }

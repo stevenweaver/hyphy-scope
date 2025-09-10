@@ -10,31 +10,13 @@ const meta = {
     data: {
       control: 'object',
       description: 'aBSREL (adaptive Branch-Site REL) analysis results data in HyPhy JSON format'
-    },
-    pvalueThreshold: {
-      control: { type: 'range', min: 0, max: 1, step: 0.01 },
-      description: 'P-value threshold for significance'
-    },
-    showColumns: {
-      control: 'check',
-      options: ['Selected', 'Tested', 'Not tested'],
-      description: 'Which branch classes to show'
-    },
-    plotType: {
-      control: 'select',
-      options: [
-        'branch ω distribution',
-        'branch LRT',
-        'uncorrected p-values'
-      ],
-      description: 'Type of plot to display'
     }
   },
   parameters: {
     layout: 'padded',
     docs: {
       description: {
-        component: 'aBSREL (adaptive Branch-Site Random Effects Likelihood) visualization component for displaying branch-level selection analysis results from HyPhy.'
+        component: 'aBSREL (adaptive Branch-Site Random Effects Likelihood) visualization component for displaying branch-level selection analysis results from HyPhy. Features interactive rate tables, statistical plots, and model comparison visualizations.'
       }
     }
   }
@@ -43,50 +25,102 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
+// Helper to generate random site data
+function generateSiteData(numSites: number) {
+  return {
+    "Site Log Likelihood": {
+      "tested": {
+        "Node1": Array.from({ length: numSites }, () => [Math.random() * -10 - 5])
+      },
+      "unconstrained": {
+        "0": Array.from({ length: numSites }, () => Math.random() * -8 - 2)
+      }
+    },
+    "data partitions": {
+      "0": {
+        "coverage": [Array.from({ length: numSites }, (_, i) => i)]
+      }
+    }
+  };
+}
+
 // Basic story with test data
 export const Default: Story = {
   args: {
-    data: absrelTestData,
-    pvalueThreshold: 0.05,
-    showColumns: ['Selected', 'Tested', 'Not tested'],
-    plotType: 'branch ω distribution'
+    data: absrelTestData
   }
 };
 
-// Branch LRT plot
-export const BranchLRTPlot: Story = {
+// With significant branches highlighted
+export const WithSignificantBranches: Story = {
   args: {
-    data: absrelTestData,
-    pvalueThreshold: 0.05,
-    showColumns: ['Selected', 'Tested'],
-    plotType: 'branch LRT'
-  }
-};
-
-// P-values plot
-export const PValuesPlot: Story = {
-  args: {
-    data: absrelTestData,
-    pvalueThreshold: 0.1,
-    showColumns: ['Selected', 'Tested', 'Not tested'],
-    plotType: 'uncorrected p-values'
-  }
-};
-
-// Strict threshold
-export const StrictThreshold: Story = {
-  args: {
-    data: absrelTestData,
-    pvalueThreshold: 0.01,
-    showColumns: ['Selected'],
-    plotType: 'branch ω distribution'
+    data: {
+      ...absrelTestData,
+      "test results": {
+        ...absrelTestData["test results"],
+        "Branch2": {
+          ...absrelTestData["test results"]["Branch2"],
+          "corrected p": 0.001,
+          "Corrected P-value": 0.001
+        }
+      }
+    }
   }
 };
 
 // Loading state
 export const Loading: Story = {
   args: {
-    data: null,
-    pvalueThreshold: 0.05
+    data: null
+  }
+};
+
+// With minimal data
+export const MinimalData: Story = {
+  args: {
+    data: {
+      "sequences": 5,
+      "sites": 100,
+      "branches tested": 2,
+      "branches with selection": 1,
+      "p-value threshold": 0.05,
+      "test results": {
+        "Node1": {
+          "Rate classes": 2,
+          "uncorrected p": 0.01,
+          "corrected p": 0.04,
+          "Bayes Factor": 15.2
+        }
+      },
+      "branch attributes": {
+        "0": {
+          "Node1": {
+            "Rate classes": 2,
+            "Corrected P-value": 0.04,
+            "Rate Distributions": {
+              "0": [0.2, 0.8],
+              "1": [2.1, 0.2]
+            }
+          }
+        }
+      },
+      "tested": {
+        "0": {
+          "Node1": "test"
+        }
+      },
+      "fits": {
+        "Baseline model": {
+          "log-likelihood": -500.1,
+          "AIC": 1010.2,
+          "parameters": 5
+        },
+        "Full adaptive model": {
+          "log-likelihood": -495.3,
+          "AIC": 1004.6,
+          "parameters": 7
+        }
+      }
+    }
   }
 };
