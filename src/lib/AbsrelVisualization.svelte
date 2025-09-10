@@ -268,6 +268,11 @@
   $: if (mounted && data && heatmapContainer) {
     renderAdvancedHeatmap();
   }
+  
+  // Re-render heatmap when plot type or other parameters change
+  $: if (mounted && data && heatmapContainer && (selectedPlotType || startSite || sitesToShow || selectedSizeField || evidenceThreshold)) {
+    renderAdvancedHeatmap();
+  }
 
   function renderPlots() {
     // P-value plot
@@ -383,7 +388,8 @@
     sitesToShow: number,
     branchOrder: string[],
     sizeField: string,
-    threshold: number
+    threshold: number,
+    plotType: string = 'evidence-ratio'
   ): HTMLDivElement {
     const container = document.createElement('div');
     container.style.width = '100%';
@@ -474,10 +480,30 @@
       svg.appendChild(text);
     }
 
+    // Create a tooltip element
+    const tooltip = document.createElement('div');
+    tooltip.style.position = 'absolute';
+    tooltip.style.padding = '8px 12px';
+    tooltip.style.background = 'rgba(0, 0, 0, 0.9)';
+    tooltip.style.color = 'white';
+    tooltip.style.fontSize = '12px';
+    tooltip.style.borderRadius = '4px';
+    tooltip.style.pointerEvents = 'none';
+    tooltip.style.opacity = '0';
+    tooltip.style.transition = 'opacity 0.2s';
+    tooltip.style.zIndex = '1000';
+    tooltip.style.fontFamily = '-apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif';
+    tooltip.style.boxShadow = '0 2px 4px rgba(0,0,0,0.2)';
+    document.body.appendChild(tooltip);
+
     // Data visualization with background squares and substitution circles
     plotData.forEach(d => {
       if (d.ER > 1) { // Only show evidence above baseline
         const branchIndex = branchOrder.indexOf(d.branch);
+        
+        // Create a group for better event handling
+        const group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+        group.style.cursor = 'pointer';
         
         // Background rectangle for evidence strength
         const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
@@ -487,7 +513,7 @@
         rect.setAttribute('height', (cellSize - 1).toString());
         rect.setAttribute('fill', colorScale(d.ER));
         rect.setAttribute('rx', '1');
-        svg.appendChild(rect);
+        group.appendChild(rect);
         
         // Small circle for substitution count based on selected field
         const subsValue = selectedSizeField === 'syn_subs' ? (d.syn_subs || 0) :
@@ -510,31 +536,85 @@
           circle.setAttribute('r', radius.toString());
           circle.setAttribute('fill', '#333');
           circle.setAttribute('opacity', '0.7');
-          svg.appendChild(circle);
+          circle.style.pointerEvents = 'none'; // Let events pass through to the rect
+          group.appendChild(circle);
         }
         
-        // Enhanced tooltip with substitution information
-        const subsInfo = selectedSizeField === 'syn_subs' ? `${subsValue} syn subs` :
-                        selectedSizeField === 'nonsyn_subs' ? `${subsValue} nonsyn subs` :
-                        `${subsValue} subs`;
+        // Enhanced tooltip content
+        const subsInfo = selectedSizeField === 'syn_subs' ? `Synonymous: ${d.syn_subs || 0}` :
+                        selectedSizeField === 'nonsyn_subs' ? `Non-synonymous: ${d.nonsyn_subs || 0}` :
+                        `Total: ${d.subs || 0}`;
         
-        const title = document.createElementNS('http://www.w3.org/2000/svg', 'title');
-        title.textContent = `${d.branch} site ${d.site}: ${d.ER.toFixed(1)}x evidence, ${subsInfo}`;
-        rect.appendChild(title);
+        // Add mouse events for tooltip
+        group.addEventListener('mouseenter', (e) => {
+          const metricLabel = plotType === 'positive-selection' ? 'Empirical Bayes Factor' : 'Evidence Ratio';
+          const metricValue = plotType === 'positive-selection' ? (d.EBF || d.ER) : d.ER;
+          
+          const tooltipContent = `
+            <div style="font-weight: bold; margin-bottom: 4px;">${d.branch}</div>
+            <div>Site: ${d.site}</div>
+            <div>${metricLabel}: ${metricValue.toFixed(2)}</div>
+            <div style="margin-top: 4px; padding-top: 4px; border-top: 1px solid rgba(255,255,255,0.2);">
+              <div>Substitutions:</div>
+              <div style="margin-left: 8px;">Total: ${d.subs || 0}</div>
+              <div style="margin-left: 8px;">Synonymous: ${d.syn_subs || 0}</div>
+              <div style="margin-left: 8px;">Non-synonymous: ${d.nonsyn_subs || 0}</div>
+            </div>
+            ${d.from && d.to ? `<div style="margin-top: 4px;">Codon: ${d.from} → ${d.to}</div>` : ''}
+          `;
+          
+          tooltip.innerHTML = tooltipContent;
+          tooltip.style.opacity = '1';
+          
+          // Position tooltip
+          const rect = (e.target as Element).getBoundingClientRect();
+          const x = rect.left + window.scrollX + cellSize / 2;
+          const y = rect.top + window.scrollY - 10;
+          
+          // Adjust position to keep tooltip on screen
+          const tooltipRect = tooltip.getBoundingClientRect();
+          let adjustedX = x - tooltipRect.width / 2;
+          let adjustedY = y - tooltipRect.height;
+          
+          if (adjustedX < 10) adjustedX = 10;
+          if (adjustedX + tooltipRect.width > window.innerWidth - 10) {
+            adjustedX = window.innerWidth - tooltipRect.width - 10;
+          }
+          
+          if (adjustedY < 10) {
+            adjustedY = rect.bottom + window.scrollY + 10;
+          }
+          
+          tooltip.style.left = `${adjustedX}px`;
+          tooltip.style.top = `${adjustedY}px`;
+        });
+        
+        group.addEventListener('mouseleave', () => {
+          tooltip.style.opacity = '0';
+        });
+        
+        svg.appendChild(group);
+      }
+    });
+    
+    // Clean up tooltip when container is removed
+    container.addEventListener('DOMNodeRemoved', () => {
+      if (tooltip.parentNode) {
+        tooltip.parentNode.removeChild(tooltip);
       }
     });
 
     container.appendChild(svg);
     
     // Add legend
-    const legend = createHeatmapLegend();
+    const legend = createHeatmapLegend(plotType);
     container.appendChild(legend);
     
     return container;
   }
 
   // Create legend for heatmap visualization
-  function createHeatmapLegend(): HTMLDivElement {
+  function createHeatmapLegend(plotType: string = 'evidence-ratio'): HTMLDivElement {
     const container = document.createElement('div');
     container.style.marginTop = '20px';
     container.style.fontSize = '12px';
@@ -548,7 +628,9 @@
     const colorTitle = document.createElement('div');
     colorTitle.style.fontWeight = '500';
     colorTitle.style.marginBottom = '4px';
-    colorTitle.textContent = 'Evidence Ratio (color intensity)';
+    colorTitle.textContent = plotType === 'positive-selection' ? 
+      'Empirical Bayes Factor (color intensity)' : 
+      'Evidence Ratio (color intensity)';
     colorLegend.appendChild(colorTitle);
     
     const colorScale = document.createElement('div');
@@ -698,7 +780,7 @@
     sizeField: string
   ): HTMLDivElement {
     // Similar implementation to evidence ratio but with EBF coloring
-    return createScrollableEvidenceRatioHeatmap(branchSiteData, startSite, sitesToShow, branchOrder, sizeField, 1);
+    return createScrollableEvidenceRatioHeatmap(branchSiteData, startSite, sitesToShow, branchOrder, sizeField, 1, 'positive-selection');
   }
 
   // Create scrollable synonymous rates plot
@@ -709,35 +791,134 @@
   ): HTMLDivElement {
     const container = document.createElement('div');
     container.style.width = '100%';
-    container.style.height = '300px';
+    container.style.height = '400px';
     container.style.overflowX = 'auto';
     container.style.border = '1px solid #ddd';
+    container.style.background = '#fafafa';
     
-    const plotWidth = Math.max(800, sitesToShow * 12);
-    const plotHeight = 200;
-    const margin = { top: 40, right: 40, bottom: 60, left: 60 };
+    const cellWidth = 16;
+    const plotWidth = Math.max(800, sitesToShow * cellWidth);
+    const plotHeight = 300;
+    const margin = { top: 30, right: 40, bottom: 50, left: 60 };
 
     const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-    svg.setAttribute('width', plotWidth.toString());
-    svg.setAttribute('height', plotHeight.toString());
+    svg.setAttribute('width', (plotWidth + margin.left + margin.right).toString());
+    svg.setAttribute('height', (plotHeight + margin.top + margin.bottom).toString());
+    svg.style.background = 'white';
+    svg.style.fontFamily = '-apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif';
 
     // Scales
-    const xScale = (site: number) => margin.left + ((site - startSite) / (sitesToShow - 1)) * (plotWidth - margin.left - margin.right);
-    const maxRate = Math.max(...siteData.map(d => d['SRV posterior mean']));
-    const yScale = (rate: number) => plotHeight - margin.bottom - (rate / maxRate) * (plotHeight - margin.top - margin.bottom);
+    const xScale = (site: number) => margin.left + (site - startSite) * cellWidth + cellWidth/2;
+    const maxRate = Math.max(...siteData.map(d => d['SRV posterior mean']), 1.4);
+    const minRate = Math.min(...siteData.map(d => d['SRV posterior mean']), 0);
+    const yScale = (rate: number) => plotHeight + margin.top - ((rate - minRate) / (maxRate - minRate)) * plotHeight;
 
-    // Add data points
+    // Add Y axis
+    const yAxis = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+    yAxis.setAttribute('x1', margin.left.toString());
+    yAxis.setAttribute('y1', margin.top.toString());
+    yAxis.setAttribute('x2', margin.left.toString());
+    yAxis.setAttribute('y2', (margin.top + plotHeight).toString());
+    yAxis.setAttribute('stroke', '#333');
+    yAxis.setAttribute('stroke-width', '1');
+    svg.appendChild(yAxis);
+
+    // Add Y axis label
+    const yLabel = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+    yLabel.setAttribute('x', '20');
+    yLabel.setAttribute('y', (margin.top + plotHeight/2).toString());
+    yLabel.setAttribute('text-anchor', 'middle');
+    yLabel.setAttribute('transform', `rotate(-90 20 ${margin.top + plotHeight/2})`);
+    yLabel.setAttribute('font-size', '12');
+    yLabel.setAttribute('fill', '#666');
+    yLabel.textContent = 'SRV posterior mean';
+    svg.appendChild(yLabel);
+
+    // Add Y axis ticks and labels
+    const tickValues = [0, 0.2, 0.4, 0.6, 0.8, 1.0, 1.2, 1.4];
+    tickValues.forEach(value => {
+      if (value >= minRate && value <= maxRate) {
+        const y = yScale(value);
+        
+        // Tick mark
+        const tick = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        tick.setAttribute('x1', (margin.left - 5).toString());
+        tick.setAttribute('y1', y.toString());
+        tick.setAttribute('x2', margin.left.toString());
+        tick.setAttribute('y2', y.toString());
+        tick.setAttribute('stroke', '#333');
+        tick.setAttribute('stroke-width', '1');
+        svg.appendChild(tick);
+        
+        // Tick label
+        const label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        label.setAttribute('x', (margin.left - 8).toString());
+        label.setAttribute('y', (y + 3).toString());
+        label.setAttribute('text-anchor', 'end');
+        label.setAttribute('font-size', '10');
+        label.setAttribute('fill', '#666');
+        label.textContent = value.toFixed(1);
+        svg.appendChild(label);
+      }
+    });
+
+    // Add X axis
+    const xAxis = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+    xAxis.setAttribute('x1', margin.left.toString());
+    xAxis.setAttribute('y1', (margin.top + plotHeight).toString());
+    xAxis.setAttribute('x2', (plotWidth + margin.left).toString());
+    xAxis.setAttribute('y2', (margin.top + plotHeight).toString());
+    xAxis.setAttribute('stroke', '#333');
+    xAxis.setAttribute('stroke-width', '1');
+    svg.appendChild(xAxis);
+
+    // Add X axis label
+    const xLabel = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+    xLabel.setAttribute('x', (margin.left + plotWidth/2).toString());
+    xLabel.setAttribute('y', (margin.top + plotHeight + 35).toString());
+    xLabel.setAttribute('text-anchor', 'middle');
+    xLabel.setAttribute('font-size', '12');
+    xLabel.setAttribute('fill', '#666');
+    xLabel.textContent = 'Codon';
+    svg.appendChild(xLabel);
+
+    // Add X axis ticks (every 10 sites)
+    for (let site = startSite; site <= startSite + sitesToShow; site += 10) {
+      const x = xScale(site);
+      
+      // Tick mark
+      const tick = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+      tick.setAttribute('x1', x.toString());
+      tick.setAttribute('y1', (margin.top + plotHeight).toString());
+      tick.setAttribute('x2', x.toString());
+      tick.setAttribute('y2', (margin.top + plotHeight + 5).toString());
+      tick.setAttribute('stroke', '#333');
+      tick.setAttribute('stroke-width', '1');
+      svg.appendChild(tick);
+      
+      // Tick label
+      const label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+      label.setAttribute('x', x.toString());
+      label.setAttribute('y', (margin.top + plotHeight + 18).toString());
+      label.setAttribute('text-anchor', 'middle');
+      label.setAttribute('font-size', '10');
+      label.setAttribute('fill', '#666');
+      label.textContent = site.toString();
+      svg.appendChild(label);
+    }
+
+    // Add data points (gray circles like in the image)
     siteData.forEach(d => {
       const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
       circle.setAttribute('cx', xScale(d.site).toString());
       circle.setAttribute('cy', yScale(d['SRV posterior mean']).toString());
-      circle.setAttribute('r', '4');
-      circle.setAttribute('fill', `hsl(${240 - d['SRV posterior mean'] * 60}, 70%, 50%)`);
-      circle.setAttribute('stroke', '#333');
-      circle.setAttribute('stroke-width', '0.5');
+      circle.setAttribute('r', '3');
+      circle.setAttribute('fill', '#999');
+      circle.setAttribute('stroke', 'none');
+      circle.setAttribute('opacity', '0.8');
       
       const title = document.createElementNS('http://www.w3.org/2000/svg', 'title');
-      title.textContent = `Site ${d.site}\\nRate: ${d['SRV posterior mean'].toFixed(3)}`;
+      title.textContent = `Codon ${d.site}: ${d['SRV posterior mean'].toFixed(3)}`;
       circle.appendChild(title);
       
       svg.appendChild(circle);
@@ -922,12 +1103,39 @@
       <div class="plot-section">
         <h3>Site Analysis</h3>
         <p class="plot-description">
-          Evidence for positive selection (ω > 1) across alignment sites. Each cell represents the evidence ratio 
-          for a branch-site combination, with darker cells indicating stronger evidence. Sites without evidence 
-          are not shown. Navigate through the alignment using the arrow buttons to explore different regions.
+          {#if selectedPlotType === 'synonymous-rates'}
+            Synonymous rate variation (SRV) posterior mean values across alignment sites. Each dot represents 
+            the posterior mean rate for synonymous substitutions at that codon position.
+          {:else}
+            Evidence for positive selection (ω > 1) across alignment sites. Each cell represents the evidence ratio 
+            for a branch-site combination, with darker cells indicating stronger evidence. Sites without evidence 
+            are not shown. Navigate through the alignment using the arrow buttons to explore different regions.
+          {/if}
         </p>
         
         <div class="minimal-controls">
+          <div class="control-row">
+            <div class="control-group">
+              <label for="plot-type">Plot type:</label>
+              <select id="plot-type" bind:value={selectedPlotType}>
+                <option value="evidence-ratio">Evidence ratio</option>
+                <option value="positive-selection">Positive selection</option>
+                <option value="synonymous-rates">Synonymous rates</option>
+              </select>
+            </div>
+            
+            {#if selectedPlotType !== 'synonymous-rates'}
+              <div class="control-group">
+                <label for="size-field">Circle size:</label>
+                <select id="size-field" bind:value={selectedSizeField}>
+                  <option value="subs">Total substitutions</option>
+                  <option value="syn_subs">Synonymous substitutions</option>
+                  <option value="nonsyn_subs">Non-synonymous substitutions</option>
+                </select>
+              </div>
+            {/if}
+          </div>
+          
           <div class="site-nav">
             <span class="sites-label">Sites {startSite}–{startSite + sitesToShow - 1}</span>
             <div class="nav-buttons">
@@ -1345,6 +1553,18 @@
     border: 1px solid #ddd;
     border-radius: 4px;
     font-size: 0.9rem;
+  }
+
+  .control-row {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+    margin-bottom: 0.5rem;
+    flex-wrap: wrap;
+  }
+
+  .control-row .control-group {
+    margin: 0;
   }
 
 </style>
