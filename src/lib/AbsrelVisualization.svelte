@@ -11,7 +11,8 @@
     formatAbsrelValue,
     getPValueColor,
     getAbsrelDistributionTable,
-    getAbsrelProfileBranchSites
+    getAbsrelProfileBranchSites,
+    getAbsrelSiteTableData
   } from './utils/absrel-utils.js';
   import { 
     createPValuePlot,
@@ -37,6 +38,14 @@
   
   // Distribution table for rate table
   $: distributionTable = data ? getAbsrelDistributionTable(data, evidenceThreshold) : [];
+  
+  // Site-by-site results table data
+  $: siteTableData = data ? getAbsrelSiteTableData(data, evidenceThreshold) : [[], {}];
+  
+  // Branch-specific site results
+  $: branchSiteTableData = data && selectedBranchForOmega ? 
+    getAbsrelProfileBranchSites(data).filter(site => site.branch === selectedBranchForOmega && site.ER >= evidenceThreshold) :
+    [];
 
   // Controls and filters
   let pValueThreshold = 0.05;
@@ -246,11 +255,8 @@
   });
 
   // Plot containers
-  let pValuePlotContainer: HTMLDivElement;
   let bayesFactorPlotContainer: HTMLDivElement;
-  let omegaPlotContainer: HTMLDivElement;
   let siteLogLikePlotContainer: HTMLDivElement;
-  let modelComparisonPlotContainer: HTMLDivElement;
   let heatmapContainer: HTMLDivElement;
 
   // Initialize plots when data is available and component is mounted
@@ -275,33 +281,12 @@
   }
 
   function renderPlots() {
-    // P-value plot
-    if (pValuePlotContainer) {
-      const pValuePlot = createPValuePlot(testedBranches, pValueThreshold);
-      if (pValuePlot) {
-        pValuePlotContainer.innerHTML = '';
-        pValuePlotContainer.appendChild(pValuePlot);
-      }
-    }
-
     // Bayes Factor plot
     if (bayesFactorPlotContainer) {
       const bayesFactorPlot = createBayesFactorPlot(testedBranches);
       if (bayesFactorPlot) {
         bayesFactorPlotContainer.innerHTML = '';
         bayesFactorPlotContainer.appendChild(bayesFactorPlot);
-      }
-    }
-
-    // Omega distribution plot
-    if (omegaPlotContainer && selectedBranchForOmega) {
-      const selectedBranch = testedBranches.find(b => b.name === selectedBranchForOmega);
-      if (selectedBranch) {
-        const omegaPlot = createOmegaDistributionPlot(selectedBranch);
-        if (omegaPlot) {
-          omegaPlotContainer.innerHTML = '';
-          omegaPlotContainer.appendChild(omegaPlot);
-        }
       }
     }
 
@@ -313,17 +298,6 @@
         siteLogLikePlotContainer.appendChild(sitePlot);
       }
     }
-
-    // Model comparison plot
-    if (modelComparisonPlotContainer && data) {
-      const modelPlot = createModelComparisonPlot(data);
-      if (modelPlot) {
-        modelComparisonPlotContainer.innerHTML = '';
-        modelComparisonPlotContainer.appendChild(modelPlot);
-      }
-    }
-
-    // Remove advanced plots functionality for now
   }
 
   function renderAdvancedHeatmap() {
@@ -1024,16 +998,6 @@
       </div>
 
       <div class="control-group">
-        <label for="omega-branch">ω distribution for branch:</label>
-        <select id="omega-branch" bind:value={selectedBranchForOmega}>
-          <option value="">Select a branch...</option>
-          {#each testedBranches as branch}
-            <option value={branch.name}>{branch.name}</option>
-          {/each}
-        </select>
-      </div>
-
-      <div class="control-group">
         <label for="evidence-threshold">Evidence ratio threshold:</label>
         <input 
           type="number" 
@@ -1046,57 +1010,6 @@
       </div>
     </div>
 
-    <!-- Model Comparison -->
-    <div class="plot-section">
-      <h3>Model Comparison</h3>
-      <p class="plot-description">
-        Comparison of baseline and full adaptive models based on log likelihood.
-      </p>
-      <div class="plot-container" bind:this={modelComparisonPlotContainer}></div>
-    </div>
-
-    <!-- P-value Significance Plot -->
-    <div class="plot-section">
-      <h3>Branch Selection Significance</h3>
-      <p class="plot-description">
-        Uncorrected and corrected p-values for each tested branch. 
-        Branches below the threshold line show evidence of selection.
-      </p>
-      <div class="plot-container" bind:this={pValuePlotContainer}></div>
-    </div>
-
-    <!-- Bayes Factor Plot -->
-    <div class="plot-section">
-      <h3>Bayes Factor Evidence</h3>
-      <p class="plot-description">
-        Bayes Factor evidence for positive selection on each branch. 
-        Higher values indicate stronger evidence.
-      </p>
-      <div class="plot-container" bind:this={bayesFactorPlotContainer}></div>
-    </div>
-
-    <!-- Omega Distribution Plot -->
-    {#if selectedBranchForOmega}
-      <div class="plot-section">
-        <h3>ω Distribution</h3>
-        <p class="plot-description">
-          Rate classes and their weights for the selected branch. 
-          Classes with ω > 1 indicate positive selection.
-        </p>
-        <div class="plot-container" bind:this={omegaPlotContainer}></div>
-      </div>
-    {/if}
-
-    <!-- Site Log Likelihood Plot -->
-    {#if selectedBranches.length > 0}
-      <div class="plot-section">
-        <h3>Site-Level Log Likelihood</h3>
-        <p class="plot-description">
-          Log likelihood values across sites for selected branches.
-        </p>
-        <div class="plot-container" bind:this={siteLogLikePlotContainer}></div>
-      </div>
-    {/if}
 
     <!-- Site Analysis -->
     {#if data && distributionTable.length > 0}
@@ -1324,6 +1237,123 @@
             </tbody>
           </table>
         </div>
+      </div>
+    {/if}
+
+    <!-- Site-by-site Results Table -->
+    {#if siteTableData[0].length > 0}
+      <div class="rate-table-section">
+        <h3>Table 2. Detailed site-by-site results</h3>
+        <p class="table-description">
+          Detailed site-by-site results from the aBSREL analysis showing codon positions, 
+          log-likelihood values, synonymous rate variation, substitutions, and evidence ratio counts.
+        </p>
+        
+        <div class="scrollable-table-container">
+          <table class="data-table">
+            <thead>
+              <tr>
+                {#each Object.entries(siteTableData[1]) as [key, label]}
+                  <th>{label}</th>
+                {/each}
+              </tr>
+            </thead>
+            <tbody>
+              {#each siteTableData[0].slice(0, 10) as row, index}
+                <tr class:even-row={index % 2 === 0}>
+                  {#each Object.keys(siteTableData[1]) as key}
+                    <td>
+                      {#if typeof row[key] === 'number'}
+                        {row[key] < 0.01 && row[key] > 0 ? row[key].toExponential(2) : 
+                         row[key] % 1 !== 0 ? row[key].toFixed(3) : row[key]}
+                      {:else}
+                        {row[key]}
+                      {/if}
+                    </td>
+                  {/each}
+                </tr>
+              {/each}
+            </tbody>
+          </table>
+          {#if siteTableData[0].length > 10}
+            <div class="table-footer">
+              Showing 10 of {siteTableData[0].length} sites
+            </div>
+          {/if}
+        </div>
+      </div>
+    {/if}
+
+    <!-- Branch-specific Site Results Table -->
+    {#if selectedBranchForOmega && branchSiteTableData.length > 0}
+      <div class="rate-table-section">
+        <h3>Table 3. Detailed site-by-site results for {selectedBranchForOmega}</h3>
+        <p class="table-description">
+          Detailed site-by-site results for a specific branch in the aBSREL analysis showing
+          evidence for positive selection at individual sites.
+        </p>
+        
+        <div class="scrollable-table-container">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Branch</th>
+                <th>Site</th>
+                <th>Parent</th>
+                <th>Codon</th>
+                <th># substitutions</th>
+                <th>Evidence ratio</th>
+                <th>Empirical BF</th>
+              </tr>
+            </thead>
+            <tbody>
+              {#each branchSiteTableData.slice(0, 10) as row, index}
+                <tr class:even-row={index % 2 === 0}>
+                  <td>{row.branch}</td>
+                  <td>{row.site}</td>
+                  <td>{row.from || 'N/A'}</td>
+                  <td>{row.to || 'N/A'}</td>
+                  <td>{row.subs}</td>
+                  <td>{row.ER.toFixed(2)}</td>
+                  <td>{row.ER.toFixed(2)}</td>
+                </tr>
+              {/each}
+            </tbody>
+          </table>
+          {#if branchSiteTableData.length > 10}
+            <div class="table-footer">
+              Showing 10 of {branchSiteTableData.length} sites with ER ≥ {evidenceThreshold}
+            </div>
+          {/if}
+        </div>
+      </div>
+    {:else if selectedBranchForOmega}
+      <div class="rate-table-section">
+        <h3>Table 3. Detailed site-by-site results for {selectedBranchForOmega}</h3>
+        <p class="table-description">
+          No sites with evidence ratio ≥ {evidenceThreshold} found for this branch.
+        </p>
+      </div>
+    {/if}
+
+    <!-- Bayes Factor Plot -->
+    <div class="plot-section">
+      <h3>Bayes Factor Evidence</h3>
+      <p class="plot-description">
+        Bayes Factor evidence for positive selection on each branch. 
+        Higher values indicate stronger evidence.
+      </p>
+      <div class="plot-container" bind:this={bayesFactorPlotContainer}></div>
+    </div>
+
+    <!-- Site Log Likelihood Plot -->
+    {#if selectedBranches.length > 0}
+      <div class="plot-section">
+        <h3>Site-Level Log Likelihood</h3>
+        <p class="plot-description">
+          Log likelihood values across sites for selected branches.
+        </p>
+        <div class="plot-container" bind:this={siteLogLikePlotContainer}></div>
       </div>
     {/if}
 
@@ -1565,6 +1595,51 @@
 
   .control-row .control-group {
     margin: 0;
+  }
+
+  .scrollable-table-container {
+    width: 100%;
+    overflow-x: auto;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    margin-top: 1rem;
+  }
+
+  .data-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9rem;
+  }
+
+  .data-table th {
+    background-color: #f5f5f5;
+    padding: 0.75rem;
+    text-align: left;
+    border-bottom: 2px solid #ddd;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+
+  .data-table td {
+    padding: 0.5rem 0.75rem;
+    border-bottom: 1px solid #eee;
+  }
+
+  .data-table tr.even-row {
+    background-color: #f9f9f9;
+  }
+
+  .data-table tbody tr:hover {
+    background-color: #f0f0f0;
+  }
+
+  .table-footer {
+    padding: 0.5rem;
+    text-align: center;
+    font-size: 0.85rem;
+    color: #666;
+    background-color: #f5f5f5;
+    border-top: 1px solid #ddd;
   }
 
 </style>
