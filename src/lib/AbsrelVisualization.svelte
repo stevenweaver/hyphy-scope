@@ -42,7 +42,7 @@
   // Reactive data processing
   $: summary = data ? getAbsrelSummary(data) : null;
   $: testedBranches = data ? getTestedBranches(data) : [];
-  $: significantBranches = testedBranches ? getSignificantBranches(testedBranches) : [];
+  $: significantBranches = testedBranches ? getSignificantBranches(testedBranches, pValueThreshold) : [];
   $: siteData = data ? getAbsrelSiteData(data) : [];
   
   // Distribution table for rate table
@@ -256,8 +256,12 @@
   let rateTableSortColumn = 'p-value';
   let rateTableSortDirection: 'asc' | 'desc' = 'asc';
 
-  // Reactive sorting for distribution table
-  $: sortedDistributionTable = [...distributionTable].sort((a, b) => {
+  // Reactive filtering and sorting for distribution table
+  $: filteredDistributionTable = showOnlySignificant 
+    ? distributionTable.filter(row => row.tested === 'Yes' && row['p-value'] !== null && row['p-value'] <= pValueThreshold)
+    : distributionTable;
+    
+  $: sortedDistributionTable = [...filteredDistributionTable].sort((a, b) => {
     let aVal = a[rateTableSortColumn as keyof typeof a];
     let bVal = b[rateTableSortColumn as keyof typeof b];
     
