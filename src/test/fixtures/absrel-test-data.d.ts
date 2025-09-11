@@ -48,6 +48,53 @@ export declare const mockAbsrelData: {
             AIC: number;
         };
     };
+    "Site Log Likelihood": {
+        unconstrained: {
+            "0": number[];
+        };
+        tested: {
+            Node1: number[][];
+            Node2: number[][];
+        };
+    };
+    substitutions: {
+        "0": ({
+            ATG: string;
+            count: number;
+            GAA?: undefined;
+            TTC?: undefined;
+            AAA?: undefined;
+            GGG?: undefined;
+        } | {
+            GAA: string;
+            count: number;
+            ATG?: undefined;
+            TTC?: undefined;
+            AAA?: undefined;
+            GGG?: undefined;
+        } | {
+            TTC: string;
+            count: number;
+            ATG?: undefined;
+            GAA?: undefined;
+            AAA?: undefined;
+            GGG?: undefined;
+        } | {
+            AAA: string;
+            count: number;
+            ATG?: undefined;
+            GAA?: undefined;
+            TTC?: undefined;
+            GGG?: undefined;
+        } | {
+            GGG: string;
+            count: number;
+            ATG?: undefined;
+            GAA?: undefined;
+            TTC?: undefined;
+            AAA?: undefined;
+        })[];
+    };
     "data partitions": {
         "0": {
             coverage: number[][];
