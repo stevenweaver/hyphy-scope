@@ -57,7 +57,8 @@
     [];
 
   // Controls and filters
-  let pValueThreshold = 0.05;
+  let pValueThreshold: number;
+  $: pValueThreshold = data?.['p-value threshold'] ?? 0.05;
   let selectedBranches: string[] = [];
   let showOnlySignificant = false;
   let selectedBranchForOmega: string = '';
