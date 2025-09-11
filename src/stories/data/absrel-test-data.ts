@@ -62,7 +62,8 @@ export const absrelTestData = {
           "1": [0.8, 0.3],
           "2": [2.5, 0.2]
         },
-        "original name": "Branch1"
+        "original name": "Branch1",
+        "Baseline MG94xREV": 0.1
       },
       "Branch2": {
         "Rate classes": 3,
@@ -72,7 +73,8 @@ export const absrelTestData = {
           "1": [1.2, 0.25],
           "2": [4.8, 0.15]
         },
-        "original name": "Branch2"
+        "original name": "Branch2",
+        "Baseline MG94xREV": 0.15
       },
       "Branch3": {
         "Rate classes": 2,
@@ -81,7 +83,8 @@ export const absrelTestData = {
           "0": [0.2, 0.7],
           "1": [0.9, 0.3]
         },
-        "original name": "Branch3"
+        "original name": "Branch3",
+        "Baseline MG94xREV": 0.08
       },
       "Branch4": {
         "Rate classes": 3,
@@ -91,7 +94,8 @@ export const absrelTestData = {
           "1": [1.1, 0.4],
           "2": [3.2, 0.2]
         },
-        "original name": "Branch4"
+        "original name": "Branch4",
+        "Baseline MG94xREV": 0.12
       },
       "Branch5": {
         "Rate classes": 2,
@@ -100,7 +104,8 @@ export const absrelTestData = {
           "0": [0.3, 0.8],
           "1": [1.0, 0.2]
         },
-        "original name": "Branch5"
+        "original name": "Branch5",
+        "Baseline MG94xREV": 0.2
       }
     }
   },

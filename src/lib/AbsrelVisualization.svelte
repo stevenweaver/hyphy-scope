@@ -1,3 +1,10 @@
+<svelte:head>
+  <link
+    rel="stylesheet"
+    href="https://cdn.jsdelivr.net/npm/phylotree@2.1.7/dist/phylotree.css"
+  />
+</svelte:head>
+
 <script lang="ts">
   import { onMount } from 'svelte';
   import * as d3 from 'd3';
@@ -12,7 +19,8 @@
     getPValueColor,
     getAbsrelDistributionTable,
     getAbsrelProfileBranchSites,
-    getAbsrelSiteTableData
+    getAbsrelSiteTableData,
+    getAbsrelTestOmega
   } from './utils/absrel-utils.js';
   import { 
     createPValuePlot,
@@ -27,6 +35,7 @@
     getAbsrelPlotOptions,
     getAbsrelPlotSpec
   } from './utils/absrel-plots.js';
+  import { phylotree } from 'phylotree';
 
   export let data: AbsrelResults;
 
@@ -59,6 +68,16 @@
   let selectedSizeField = 'subs';
   let startSite = 1;
   let sitesToShow = 70;
+  
+  // Tree controls
+  let showTree = true;
+  let colorBranches = 'Support for selection';
+  let branchLength = 'Baseline MG94xREV';
+  let treeWidth = 800;
+  let treeHeight = 600;
+  let showScale = true;
+  let alignTips = false;
+  let showInternal = false;
   
   // Formatting functions
   const floatFormat = d3.format(".4g");
@@ -258,6 +277,7 @@
   let bayesFactorPlotContainer: HTMLDivElement;
   let siteLogLikePlotContainer: HTMLDivElement;
   let heatmapContainer: HTMLDivElement;
+  let treeContainer: HTMLDivElement;
 
   // Initialize plots when data is available and component is mounted
   let mounted = false;
@@ -279,6 +299,11 @@
   $: if (mounted && data && heatmapContainer && (selectedPlotType || startSite || sitesToShow || selectedSizeField || evidenceThreshold)) {
     renderAdvancedHeatmap();
   }
+  
+  // Re-render tree when parameters change
+  $: if (mounted && data && showTree && (colorBranches || branchLength || treeWidth || treeHeight || showScale || alignTips || showInternal)) {
+    renderAbsrelTree();
+  }
 
   function renderPlots() {
     // Bayes Factor plot
@@ -297,6 +322,180 @@
         siteLogLikePlotContainer.innerHTML = '';
         siteLogLikePlotContainer.appendChild(sitePlot);
       }
+    }
+    
+    // Tree rendering
+    if (treeContainer && showTree) {
+      renderAbsrelTree();
+    }
+  }
+  
+  function renderAbsrelTree() {
+    if (!data?.input?.trees || !treeContainer) return;
+    
+    try {
+      // Clear previous tree
+      treeContainer.innerHTML = '';
+      
+      // Get the Newick string
+      const newick = data.input.trees;
+      if (!newick) return;
+      
+      // Create phylotree instance
+      const tree = new phylotree(newick);
+      
+      // Set branch length accessor with fallback to default values
+      const branchAttributes = data['branch attributes']?.[0] || {};
+      tree.branch_length_accessor = (node) => {
+        if (!node.data?.name) return 0.1; // Default branch length
+        
+        const branchData = branchAttributes[node.data.name];
+        if (!branchData) return 0.1; // Default branch length
+        
+        const lengthValue = branchData[branchLength];
+        if (lengthValue === null || lengthValue === undefined || isNaN(lengthValue)) {
+          return 0.1; // Default branch length
+        }
+        
+        return Math.max(0.001, Number(lengthValue)); // Ensure positive, non-zero value
+      };
+      
+      // Render the tree
+      const renderedTree = tree.render({
+        height: treeHeight,
+        width: treeWidth,
+        'align-tips': alignTips,
+        'selectable': false,
+        'show-scale': showScale,
+        'is-radial': false,
+        'left-right-spacing': 'fit-to-size',
+        'top-bottom-spacing': 'fit-to-size',
+        'node_circle_size': () => 0,
+        'internal-names': showInternal
+      });
+
+      // Add SVG definitions for gradients
+      const svg = renderedTree.svg;
+      let defs = svg.select('defs');
+      if (defs.empty()) {
+        defs = svg.append('defs');
+      }
+
+      // Apply branch coloring based on selected option
+      if (colorBranches === 'Tested') {
+        const tested = data.tested?.[0] || {};
+        renderedTree.style_edges((element, node) => {
+          const branchName = node.target?.data?.name;
+          if (branchName && tested[branchName] === 'test') {
+            element.style('stroke', 'firebrick');
+          } else {
+            element.style('stroke', null);
+          }
+        });
+      } else if (colorBranches === 'Support for selection') {
+        // Create colorblind-friendly color scale with more pop
+        const colorScale = d3.scaleDivergingLog()
+          .domain([1e-4, 1, 1000])
+          .range(['#0571b0', '#f7f7f7', '#ca0020']); // Colorblind-friendly blue-white-red
+        
+        let gradientId = 0;
+        const tested = data.tested?.[0] || {};
+        
+        renderedTree.style_edges((element, node) => {
+          const branchName = node.target?.data?.name;
+          if (!branchName) return;
+          
+          const isTest = tested[branchName] === 'test';
+          const omegaData = getAbsrelTestOmega(data, branchName);
+          
+          // Calculate p-value based stroke width
+          const testResults = data['test results']?.[branchName];
+          const pValue = testResults?.['corrected p'] || testResults?.['Corrected P-value'];
+          let strokeWidth = 2; // Default
+          
+          if (isTest && pValue !== undefined) {
+            if (pValue <= 0.001) {
+              strokeWidth = 6; // Highly significant
+            } else if (pValue <= 0.01) {
+              strokeWidth = 5; // Very significant  
+            } else if (pValue <= 0.05) {
+              strokeWidth = 4; // Significant
+            } else {
+              strokeWidth = 3; // Not significant but tested
+            }
+          }
+          
+          if (omegaData.length > 0) {
+            // Create gradient for this branch
+            const gradientIdStr = `absrel_gradient_${gradientId++}`;
+            const gradient = defs.append('linearGradient')
+              .attr('id', gradientIdStr);
+            
+            let currentFrac = 0;
+            omegaData.forEach(omega => {
+              gradient.append('stop')
+                .attr('offset', `${currentFrac * 100}%`)
+                .style('stop-color', colorScale(omega.value));
+              
+              currentFrac += omega.weight;
+              gradient.append('stop')
+                .attr('offset', `${currentFrac * 100}%`)
+                .style('stop-color', colorScale(omega.value));
+            });
+            
+            // Apply gradient to branch with p-value thickness
+            element.style('stroke', `url(#${gradientIdStr})`)
+              .style('stroke-width', `${strokeWidth}px`)
+              .style('opacity', isTest ? 1.0 : 0.6)
+              .style('stroke-linejoin', 'round')
+              .style('stroke-linecap', 'round');
+            
+            // Add tooltip
+            const maxOmega = omegaData[omegaData.length - 1];
+            
+            let tooltipText = `${branchName} `;
+            if (isTest && pValue !== undefined) {
+              const significance = pValue <= 0.001 ? '***' : pValue <= 0.01 ? '**' : pValue <= 0.05 ? '*' : '';
+              tooltipText += `(p = ${pValue.toFixed(3)}${significance})`;
+            } else {
+              tooltipText += '(not tested)';
+            }
+            tooltipText += ` max ω = ${maxOmega.value.toFixed(2)}`;
+            
+            element.selectAll('title').data([tooltipText]).join('title').text(d => d);
+          }
+        });
+      }
+      
+      // Style nodes to use monospace font
+      renderedTree.style_nodes((element, node) => {
+        element.selectAll('text').style('font-family', 'ui-monospace');
+        if (!node.children || !node.children.length) {
+          element.selectAll('title').data([node.data.name]).join('title').text(d => d);
+        }
+      });
+      
+      // Sort nodes by depth
+      tree.traverse_and_compute(function(node) {
+        let depth = 1;
+        if (node.children && node.children.length) {
+          depth += d3.max(node.children, d => d.count_depth || 0);
+        }
+        node.count_depth = depth;
+      });
+      
+      tree.resortChildren((a, b) => a.count_depth - b.count_depth);
+      
+      // Place nodes and update
+      renderedTree.placenodes();
+      renderedTree.update();
+      
+      // Add to container
+      treeContainer.appendChild(renderedTree.show());
+      
+    } catch (error) {
+      console.error('Error rendering ABSREL tree:', error);
+      treeContainer.innerHTML = '<p>Error rendering tree</p>';
     }
   }
 
@@ -1078,7 +1277,95 @@
       </div>
     {/if}
 
+    <!-- Phylogenetic Tree Visualization -->
+    {#if showTree && data?.input?.trees}
+      <div class="plot-section">
+        <h3>Phylogenetic Tree</h3>
+        <p class="plot-description">
+          Phylogenetic tree showing evidence for positive selection. Branch colors and thicknesses 
+          indicate selection pressure, with red indicating positive selection (ω &gt; 1) and blue 
+          indicating purifying selection (ω &lt; 1).
+        </p>
+        
+        <div class="tree-controls">
+          <div class="control-row">
+            <div class="control-group">
+              <label for="color-branches">Color branches:</label>
+              <select id="color-branches" bind:value={colorBranches}>
+                <option value="Tested">Tested branches</option>
+                <option value="Support for selection">Support for selection</option>
+              </select>
+            </div>
+            
+            <div class="control-group">
+              <label for="branch-length">Branch length:</label>
+              <select id="branch-length" bind:value={branchLength}>
+                <option value="Baseline MG94xREV">Baseline MG94xREV</option>
+                <option value="original name">Original length</option>
+              </select>
+            </div>
+            
+            <div class="control-group">
+              <label for="tree-width">Width:</label>
+              <input type="number" id="tree-width" bind:value={treeWidth} min="400" max="1200" step="50" />
+            </div>
+            
+            <div class="control-group">
+              <label for="tree-height">Height:</label>
+              <input type="number" id="tree-height" bind:value={treeHeight} min="300" max="1000" step="50" />
+            </div>
+          </div>
+          
+          <div class="control-row">
+            <div class="control-group">
+              <label>
+                <input type="checkbox" bind:checked={showScale} />
+                Show scale
+              </label>
+            </div>
+            
+            <div class="control-group">
+              <label>
+                <input type="checkbox" bind:checked={alignTips} />
+                Align tips
+              </label>
+            </div>
+            
+            <div class="control-group">
+              <label>
+                <input type="checkbox" bind:checked={showInternal} />
+                Show internal nodes
+              </label>
+            </div>
+          </div>
+        </div>
 
+        <div class="tree-container" bind:this={treeContainer}></div>
+        
+        {#if colorBranches === 'Support for selection'}
+          <div class="tree-legend">
+            <div class="legend-title">ω (dN/dS ratio)</div>
+            <div class="omega-scale">
+              <div class="scale-bar"></div>
+              <div class="scale-labels">
+                <span>0.0001</span>
+                <span>0.001</span>
+                <span>0.01</span>
+                <span>0.1</span>
+                <span>1</span>
+                <span>10</span>
+                <span>100</span>
+                <span>1000</span>
+              </div>
+            </div>
+            <div class="legend-description">
+              <strong>Color:</strong> Blue: Purifying selection (ω &lt; 1) | White: Neutral (ω = 1) | Red: Positive selection (ω &gt; 1)<br>
+              <strong>Thickness:</strong> Thicker branches = more significant p-values (*** p≤0.001, ** p≤0.01, * p≤0.05)
+            </div>
+          </div>
+        {/if}
+      </div>
+    {/if}
 
     <!-- Branch-by-branch Rate Table -->
     {#if distributionTable.length > 0}
@@ -1640,6 +1927,108 @@
     color: #666;
     background-color: #f5f5f5;
     border-top: 1px solid #ddd;
+  }
+
+  .tree-controls {
+    background: #f8f9fa;
+    padding: 1rem;
+    border-radius: 4px;
+    margin-bottom: 1rem;
+  }
+
+  .tree-container {
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    background: #fff;
+    overflow: auto;
+    min-height: 400px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 1rem;
+  }
+
+  .tree-legend {
+    background: #f8f9fa;
+    padding: 1rem;
+    border-radius: 4px;
+    border: 1px solid #ddd;
+    font-size: 0.9rem;
+  }
+
+  .legend-title {
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+    color: #333;
+  }
+
+  .omega-scale {
+    margin-bottom: 0.5rem;
+  }
+
+  .scale-bar {
+    height: 20px;
+    background: linear-gradient(to right, 
+      #0571b0 0%, 
+      #2166ac 12.5%, 
+      #4393c3 25%, 
+      #92c5de 37.5%, 
+      #f7f7f7 50%, 
+      #fddbc7 62.5%, 
+      #f4a582 75%, 
+      #d6604d 87.5%, 
+      #ca0020 100%);
+    border-radius: 4px;
+    border: 1px solid #ccc;
+    margin-bottom: 0.25rem;
+  }
+
+  .scale-labels {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.75rem;
+    color: #666;
+  }
+
+  .legend-description {
+    font-size: 0.8rem;
+    color: #666;
+    font-style: italic;
+  }
+
+  input[type="number"] {
+    width: 80px;
+  }
+
+  /* Phylotree specific styles */
+  :global(.phylotree-container) {
+    font-family: ui-monospace, 'Courier New', monospace;
+  }
+
+  :global(.node) {
+    fill: #333;
+    stroke: #333;
+  }
+
+  :global(.branch) {
+    fill: none;
+    stroke: #333;
+    stroke-width: 1px;
+  }
+
+  :global(.internal-node) {
+    fill: #666;
+    stroke: #666;
+  }
+
+  :global(.tree-scale-bar) {
+    stroke: #666;
+    stroke-width: 1px;
+  }
+
+  :global(.tree-scale-label) {
+    font-size: 10px;
+    fill: #666;
   }
 
 </style>
