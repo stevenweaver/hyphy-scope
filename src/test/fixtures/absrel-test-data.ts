@@ -49,6 +49,24 @@ export const mockAbsrelData = {
       "AIC": 2519.2
     }
   },
+  "Site Log Likelihood": {
+    "unconstrained": {
+      "0": [-15.2, -12.8, -18.3, -14.7, -16.1]
+    },
+    "tested": {
+      "Node1": [[-16.1], [-13.2], [-19.1], [-15.3], [-17.0]],
+      "Node2": [[-15.8], [-13.0], [-18.7], [-15.1], [-16.5]]
+    }
+  },
+  "substitutions": {
+    "0": [
+      { "ATG": "CTG", "count": 2 },
+      { "GAA": "GAG", "count": 1 },
+      { "TTC": "TTT", "count": 3 },
+      { "AAA": "AAG", "count": 1 },
+      { "GGG": "AGG", "count": 2 }
+    ]
+  },
   "data partitions": {
     "0": {
       "coverage": [[0, 1, 2, 3, 4]]
