@@ -354,21 +354,14 @@
       // Create phylotree instance
       const tree = new phylotree(newick);
       
-      // Set branch length accessor with fallback to default values
-      const branchAttributes = data['branch attributes']?.[0] || {};
-      tree.branch_length_accessor = (node) => {
-        if (!node.data?.name) return 0.1; // Default branch length
-        
-        const branchData = branchAttributes[node.data.name];
-        if (!branchData) return 0.1; // Default branch length
-        
-        const lengthValue = branchData[branchLength];
-        if (lengthValue === null || lengthValue === undefined || isNaN(lengthValue)) {
-          return 0.1; // Default branch length
-        }
-        
-        return Math.max(0.001, Number(lengthValue)); // Ensure positive, non-zero value
-      };
+      // Validate tree was created successfully
+      if (!tree) {
+        treeContainer.innerHTML = '<p>Failed to create tree from data</p>';
+        return;
+      }
+      
+      // Skip branch length accessor - causes phylotree.js internal errors
+      // Branch lengths will be handled by the tree's native parsing
       
       // Render the tree
       const renderedTree = tree.render({
@@ -384,7 +377,13 @@
         'internal-names': showInternal
       });
 
-      // Add SVG definitions for gradients
+      // Validate tree was rendered successfully
+      if (!renderedTree) {
+        treeContainer.innerHTML = '<p>Failed to render tree</p>';
+        return;
+      }
+
+      // Add SVG definitions for gradients (with safety check)
       const svg = renderedTree.svg;
       let defs = svg.select('defs');
       if (defs.empty()) {
@@ -477,31 +476,26 @@
         });
       }
       
-      // Style nodes to use monospace font
-      renderedTree.style_nodes((element, node) => {
-        element.selectAll('text').style('font-family', 'ui-monospace');
-        if (!node.children || !node.children.length) {
-          element.selectAll('title').data([node.data.name]).join('title').text(d => d);
-        }
-      });
+      // Style nodes to use monospace font (only if renderedTree is properly initialized)
+      if (renderedTree && typeof renderedTree.style_nodes === 'function') {
+        renderedTree.style_nodes((element, node) => {
+          element.selectAll('text').style('font-family', 'ui-monospace');
+          if (!node.children || !node.children.length) {
+            element.selectAll('title').data([node.data.name]).join('title').text(d => d);
+          }
+        });
+      }
       
-      // Sort nodes by depth
-      tree.traverse_and_compute(function(node) {
-        let depth = 1;
-        if (node.children && node.children.length) {
-          depth += d3.max(node.children, d => d.count_depth || 0);
-        }
-        node.count_depth = depth;
-      });
+      // Skip traverse_and_compute and resortChildren - these can cause phylotree.js internal errors
+      // The tree will use its default layout and sorting
       
-      tree.resortChildren((a, b) => a.count_depth - b.count_depth);
-      
-      // Place nodes and update
-      renderedTree.placenodes();
-      renderedTree.update();
-      
-      // Add to container
-      treeContainer.appendChild(renderedTree.show());
+      // Add to container (using the safer approach from PhylogeneticTreeViewer)
+      treeContainer.innerHTML = '';
+      if (renderedTree && typeof renderedTree.show === 'function') {
+        treeContainer.appendChild(renderedTree.show());
+      } else {
+        treeContainer.innerHTML = '<p>Tree rendering failed - invalid tree data</p>';
+      }
       
     } catch (error) {
       console.error('Error rendering ABSREL tree:', error);
