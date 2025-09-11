@@ -368,7 +368,7 @@ export function getAbsrelAttributes(resultsJson: any): AbsrelAttributes {
  */
 function getSrvDistribution(resultsJson: any): Array<{value: number; weight: number}> | null {
   const srvData = resultsJson.fits?.["Full adaptive model"]?.["Rate Distributions"]?.["Synonymous site-to-site rates"];
-  if (!srvData) return null;
+  if (!srvData || !Array.isArray(srvData)) return null;
   
   return srvData.map((item: any, index: number) => ({
     value: item.rate || item[0] || 0,
@@ -417,7 +417,7 @@ export function getAbsrelProfileBranchSites(resultsJson: any): AbsrelProfileSite
   const unc = resultsJson["Site Log Likelihood"]?.["unconstrained"]?.["0"];
   const subs = resultsJson["substitutions"]?.["0"];
   
-  if (!unc || !subs) {
+  if (!unc || !subs || !Array.isArray(unc)) {
     // Return empty array if data not available
     return results;
   }
@@ -589,7 +589,9 @@ export function getAbsrelTestOmega(resultsJson: any, branch: string): Array<{val
 export function getAbsrelSiteIndexPartitionCodon(resultsJson: any): Array<[number, number]> {
   const partitions = resultsJson['data partitions'] || {};
   const mappedData = Object.entries(partitions).map(([k, d]: [string, any]) => {
-    return d['coverage'][0].map((site: number) => [+k + 1, site + 1]);
+    const coverage = d?.['coverage']?.[0];
+    if (!Array.isArray(coverage)) return [];
+    return coverage.map((site: number) => [+k + 1, site + 1]);
   });
   return ([] as Array<[number, number]>).concat(...mappedData);
 }
