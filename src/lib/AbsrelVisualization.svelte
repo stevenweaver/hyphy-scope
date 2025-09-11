@@ -40,7 +40,12 @@
   export let data: AbsrelResults;
 
   // Reactive data processing
-  $: summary = data ? getAbsrelSummary(data) : null;
+  $: baseSummary = data ? getAbsrelSummary(data) : null;
+  $: summary = baseSummary ? {
+    ...baseSummary,
+    branchesWithSelection: significantBranches.length,
+    pValueThreshold
+  } : null;
   $: testedBranches = data ? getTestedBranches(data) : [];
   $: significantBranches = testedBranches ? getSignificantBranches(testedBranches, pValueThreshold) : [];
   $: siteData = data ? getAbsrelSiteData(data) : [];
