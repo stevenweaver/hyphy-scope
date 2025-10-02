@@ -25,7 +25,8 @@ export async function loadDataFromUrl(url: string): Promise<any | null> {
   try {
     const response = await fetch(url);
     const data = await response.json();
-    return data?.MLE ? data : null;
+    // Accept data if it has MLE (BGM, FEL, etc.) or test results (other analyses)
+    return data?.MLE || data?.['test results'] ? data : null;
   } catch (error) {
     console.error('Error loading JSON from URL:', error);
     return null;

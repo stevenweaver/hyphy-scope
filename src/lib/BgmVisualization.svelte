@@ -11,23 +11,54 @@
   let correlationContainer: HTMLDivElement;
 
   function getBgmSummary(data: any) {
-    const testResults = data['test results'] || {};
+    // BGM data has MLE.content array instead of test results object
+    const mleContent = data.MLE?.content || [];
+    const significantThreshold = 0.5; // P[Site 1 <-> Site 2] > 0.5 for meaningful dependency
+    
+    // Validate data structure
+    if (!Array.isArray(mleContent)) {
+      console.warn('BGM data MLE.content is not an array');
+      return null;
+    }
+    
     return {
-      sequences: data.input?.sequences || 0,
-      sites: data.input?.sites || 0,
+      sequences: data.input?.['number of sequences'] || 0,
+      sites: data.input?.['number of sites'] || 0,
       partitions: Object.keys(data['data partitions'] || {}).length,
-      correlations: Object.keys(testResults).length,
-      significantCorrelations: Object.values(testResults).filter((r: any) => (r['p-value'] || 1) <= 0.05).length
+      correlations: mleContent.length,
+      significantCorrelations: mleContent.filter((row: any[]) => Array.isArray(row) && row.length > 4 && (row[4] || 0) > significantThreshold).length
     };
   }
 
   function getCorrelationData(data: any) {
-    const testResults = data['test results'] || {};
-    return Object.entries(testResults).map(([pair, result]: [string, any]) => ({
-      pair,
-      correlation: result.correlation || 0,
-      pValue: result['p-value'] || 1,
-      significant: (result['p-value'] || 1) <= 0.05
+    // BGM MLE content structure:
+    // [0]: Site 1 index
+    // [1]: Site 2 index
+    // [2]: P[Site 1 -> Site 2]
+    // [3]: P[Site 2 -> Site 1]
+    // [4]: P[Site 1 <-> Site 2] (bidirectional probability)
+    // [5]: Site 1 subs
+    // [6]: Site 2 subs
+    // [7]: Shared subs
+    const mleContent = data.MLE?.content || [];
+    
+    // Validate data structure
+    if (!Array.isArray(mleContent)) {
+      console.warn('BGM data MLE.content is not an array');
+      return [];
+    }
+    
+    // Filter valid rows and sort by bidirectional probability
+    const validRows = mleContent.filter((row: any[]) => Array.isArray(row) && row.length > 4);
+    const sortedData = validRows
+      .sort((a: any[], b: any[]) => (b[4] || 0) - (a[4] || 0))
+      .slice(0, 50);
+    
+    return sortedData.map((row: any[]) => ({
+      pair: `${row[0]}-${row[1]}`,
+      correlation: row[4] || 0, // Using bidirectional probability as correlation strength
+      pValue: 1 - (row[4] || 0), // Convert probability to pseudo p-value for visualization
+      significant: (row[4] || 0) > 0.5 // Meaningful dependency threshold
     }));
   }
 
@@ -35,19 +66,24 @@
     if (!data.length) return null;
 
     return Plot.plot({
-      title: "Site-to-Site Correlations",
+      title: "Site-to-Site Conditional Dependencies (Top 50)",
       width: 800,
       height: 400,
-      x: { label: "Site Pair", type: "band" },
-      y: { label: "Correlation Coefficient", grid: true },
-      color: { legend: true },
+      x: { label: "Site Pair", type: "band", tickRotate: -45 },
+      y: { label: "P[Site 1 ↔ Site 2]", grid: true, domain: [0, 1] },
+      color: { 
+        legend: true,
+        domain: [false, true],
+        range: ["#6c757d", "#e3243b"],
+        label: "Significant (P > 0.5)"
+      },
       marks: [
-        Plot.ruleY([0], { stroke: "#666", strokeDasharray: "3,3" }),
+        Plot.ruleY([0.5], { stroke: "#e3243b", strokeDasharray: "3,3", strokeWidth: 2 }),
         Plot.barY(data, {
           x: "pair",
           y: "correlation",
           fill: "significant",
-          title: d => `${d.pair}\nCorrelation: ${d.correlation.toFixed(3)}\np-value: ${d.pValue.toFixed(4)}`
+          title: d => `Sites ${d.pair}\nP[dependency]: ${d.correlation.toFixed(4)}\nSignificant: ${d.significant ? 'Yes' : 'No'}`
         })
       ]
     });
@@ -108,7 +144,11 @@
     {/if}
 
     <div class="plot-section">
-      <h3>Site Correlations</h3>
+      <h3>Conditional Dependencies Between Sites</h3>
+      <p style="color: #666; font-size: 0.9rem; margin: 0.5rem 0 1rem 0;">
+        Posterior probabilities of conditional dependence between codon sites. 
+        Values > 0.5 indicate meaningful evidence for co-evolution.
+      </p>
       <div class="plot-container" bind:this={correlationContainer}></div>
     </div>
 

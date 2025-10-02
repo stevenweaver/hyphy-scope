@@ -61,7 +61,14 @@
     try {
       loading = true;
       error = '';
-      bgmData = await loadDataFromStorage(file);
+      
+      const text = await file.text();
+      bgmData = JSON.parse(text);
+      
+      // Validate BGM data structure
+      if (!bgmData.MLE && !bgmData['test results']) {
+        throw new Error('Invalid BGM data format');
+      }
     } catch (e) {
       error = `Failed to load file: ${e.message}`;
       bgmData = null;
