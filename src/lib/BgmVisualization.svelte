@@ -1,36 +1,63 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
+  import { onMount, afterUpdate } from 'svelte';
   import * as Plot from "@observablehq/plot";
 
   export let data: any;
 
-  // Simple BGM visualization focused on key results
-  $: summary = data ? getBgmSummary(data) : null;
-  $: correlationData = data ? getCorrelationData(data) : [];
-
+  // Initialize reactive values
+  let summary: any = null;
+  let correlationData: any[] = [];
   let correlationContainer: HTMLDivElement;
+  let mounted = false;
 
-  function getBgmSummary(data: any) {
+  // Force reactivity by rebuilding values when data changes
+  $: if (data) {
+    console.log('BGM data received:', data);
+    summary = getBgmSummary(data);
+    correlationData = getCorrelationData(data);
+    console.log('BGM summary computed:', summary);
+    console.log('BGM correlation data length:', correlationData.length);
+    
+    // Trigger plot render after data update
+    if (mounted) {
+      renderPlots();
+    }
+  }
+
+  function getBgmSummary(bgmData: any) {
+    if (!bgmData) return null;
+    
     // BGM data has MLE.content array instead of test results object
-    const mleContent = data.MLE?.content || [];
+    const mleContent = bgmData.MLE?.content;
     const significantThreshold = 0.5; // P[Site 1 <-> Site 2] > 0.5 for meaningful dependency
     
     // Validate data structure
-    if (!Array.isArray(mleContent)) {
-      console.warn('BGM data MLE.content is not an array');
-      return null;
+    if (!mleContent || !Array.isArray(mleContent)) {
+      console.warn('BGM data MLE.content is not an array:', mleContent);
+      return {
+        sequences: 0,
+        sites: 0,
+        partitions: 0,
+        correlations: 0,
+        significantCorrelations: 0
+      };
     }
     
-    return {
-      sequences: data.input?.['number of sequences'] || 0,
-      sites: data.input?.['number of sites'] || 0,
-      partitions: Object.keys(data['data partitions'] || {}).length,
+    const result = {
+      sequences: bgmData.input?.['number of sequences'] || 0,
+      sites: bgmData.input?.['number of sites'] || 0,
+      partitions: Object.keys(bgmData['data partitions'] || {}).length,
       correlations: mleContent.length,
       significantCorrelations: mleContent.filter((row: any[]) => Array.isArray(row) && row.length > 4 && (row[4] || 0) > significantThreshold).length
     };
+    
+    console.log('BGM summary result:', result);
+    return result;
   }
 
-  function getCorrelationData(data: any) {
+  function getCorrelationData(bgmData: any) {
+    if (!bgmData) return [];
+    
     // BGM MLE content structure:
     // [0]: Site 1 index
     // [1]: Site 2 index
@@ -40,11 +67,11 @@
     // [5]: Site 1 subs
     // [6]: Site 2 subs
     // [7]: Shared subs
-    const mleContent = data.MLE?.content || [];
+    const mleContent = bgmData.MLE?.content;
     
     // Validate data structure
-    if (!Array.isArray(mleContent)) {
-      console.warn('BGM data MLE.content is not an array');
+    if (!mleContent || !Array.isArray(mleContent)) {
+      console.warn('BGM data MLE.content is not an array:', mleContent);
       return [];
     }
     
@@ -89,23 +116,24 @@
     });
   }
 
-  // Initialize plots when data is available and component is mounted
-  let mounted = false;
-  
   onMount(() => {
     mounted = true;
+    // If data is already available when mounted, render plots
+    if (correlationData.length > 0) {
+      renderPlots();
+    }
   });
 
-  $: if (mounted && correlationData.length > 0) {
-    renderPlots();
-  }
-
   function renderPlots() {
-    if (correlationContainer) {
+    if (correlationContainer && correlationData.length > 0) {
+      console.log('Rendering BGM plot with data length:', correlationData.length);
       const plot = createCorrelationPlot(correlationData);
       if (plot) {
         correlationContainer.innerHTML = '';
         correlationContainer.appendChild(plot);
+        console.log('BGM plot rendered successfully');
+      } else {
+        console.warn('BGM plot creation failed');
       }
     }
   }
@@ -123,21 +151,40 @@
     {#if summary}
       <div class="summary-tiles">
         <div class="tile">
-          <div class="tile-number">{summary.sequences}</div>
+          <div class="tile-number">{summary.sequences || 0}</div>
           <div class="tile-description">Sequences</div>
         </div>
         <div class="tile">
-          <div class="tile-number">{summary.sites}</div>
+          <div class="tile-number">{summary.sites || 0}</div>
           <div class="tile-description">Sites</div>
         </div>
         <div class="tile">
-          <div class="tile-number">{summary.correlations}</div>
+          <div class="tile-number">{summary.correlations || 0}</div>
           <div class="tile-description">Tested Pairs</div>
         </div>
         <div class="tile">
           <div class="tile-number" style="color: #e3243b">
-            {summary.significantCorrelations}
+            {summary.significantCorrelations || 0}
           </div>
+          <div class="tile-description">Significant Correlations</div>
+        </div>
+      </div>
+    {:else}
+      <div class="summary-tiles">
+        <div class="tile">
+          <div class="tile-number">0</div>
+          <div class="tile-description">Sequences</div>
+        </div>
+        <div class="tile">
+          <div class="tile-number">0</div>
+          <div class="tile-description">Sites</div>
+        </div>
+        <div class="tile">
+          <div class="tile-number">0</div>
+          <div class="tile-description">Tested Pairs</div>
+        </div>
+        <div class="tile">
+          <div class="tile-number" style="color: #e3243b">0</div>
           <div class="tile-description">Significant Correlations</div>
         </div>
       </div>
