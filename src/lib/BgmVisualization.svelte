@@ -3,14 +3,30 @@
   import * as Plot from "@observablehq/plot";
 
   export let data: any;
+  
+  // Force reactivity by creating a local copy that Svelte will track
+  let localData = null;
+  
+  // Create a reactive key that changes when data changes
+  $: dataKey = data ? JSON.stringify(data).substring(0, 100) : '';
+  
+  // Watch for data changes and create new reference
+  $: if (data) {
+    // Deep clone to ensure new reference and trigger reactivity
+    localData = JSON.parse(JSON.stringify(data));
+    console.log('BGM: Created new data reference', localData);
+    console.log('BGM: Data key changed to', dataKey);
+  } else {
+    localData = null;
+  }
 
-  // Reactive data processing - using same pattern as working components
-  $: summary = data ? getBgmSummary(data) : null;
-  $: correlationData = data ? getCorrelationData(data) : [];
+  // Reactive data processing - using localData instead of prop
+  $: summary = localData ? getBgmSummary(localData) : null;
+  $: correlationData = localData ? getCorrelationData(localData) : [];
   
   // Debug logging to understand reactivity issues
-  $: if (data) {
-    console.log('BGM data received:', data);
+  $: if (localData) {
+    console.log('BGM localData active:', localData);
     console.log('BGM summary computed:', summary);
     console.log('BGM correlation data length:', correlationData?.length || 0);
   }
@@ -24,33 +40,22 @@
   let mounted = false;
 
   function getBgmSummary(bgmData: any) {
-    console.log('getBgmSummary called with:', bgmData);
-    
     if (!bgmData) {
-      console.log('No bgmData provided');
       return null;
     }
     
     // BGM data has MLE.content array instead of test results object
     const mleContent = bgmData.MLE?.content;
-    // For debugging: check if we have any values over different thresholds
+    
+    // Calculate max P value for adaptive threshold
     let maxP = 0;
     if (mleContent && mleContent.length > 0) {
       maxP = Math.max(...mleContent.map(row => row[4] || 0));
-      const count01 = mleContent.filter(row => (row[4] || 0) > 0.01).length;
-      const count05 = mleContent.filter(row => (row[4] || 0) > 0.05).length;
-      const count5 = mleContent.filter(row => (row[4] || 0) > 0.5).length;
-      console.log(`BGM threshold analysis: max P=${maxP}, count>0.01=${count01}, count>0.05=${count05}, count>0.5=${count5}`);
     }
     
     // Use lower threshold for test data, higher for real data
     // The test data has small probabilities, but user's real data has P > 0.5
     const significantThreshold = maxP > 0.1 ? 0.5 : 0.005; // Adaptive threshold
-    console.log(`Using significance threshold: ${significantThreshold} (max P in data: ${maxP})`)
-    
-    console.log('MLE content:', mleContent);
-    console.log('Input data:', bgmData.input);
-    console.log('Data partitions:', bgmData['data partitions']);
     
     // Validate data structure
     if (!mleContent || !Array.isArray(mleContent)) {
@@ -64,21 +69,12 @@
       };
     }
     
-    // Test the filtering logic with sample data
-    const sampleRow = mleContent[0];
-    console.log('Sample MLE row:', sampleRow);
-    console.log('Sample row length:', sampleRow?.length);
-    console.log('Sample P[Site 1 <-> Site 2] (index 4):', sampleRow?.[4]);
-    
     const significantRows = mleContent.filter((row: any[]) => {
       const isValidRow = Array.isArray(row) && row.length > 4;
       const pValue = row[4] || 0;
       const isSignificant = pValue > significantThreshold;
-      console.log(`Row ${row[0]}-${row[1]}: valid=${isValidRow}, p=${pValue}, significant=${isSignificant}`);
       return isValidRow && isSignificant;
     });
-    
-    console.log('Significant rows count:', significantRows.length);
     
     const summary = {
       sequences: bgmData.input?.['number of sequences'] || 0,
@@ -88,7 +84,6 @@
       significantCorrelations: significantRows.length
     };
     
-    console.log('Computed summary:', summary);
     return summary;
   }
 
@@ -165,13 +160,14 @@
   {#if !data}
     <div class="loading">Loading BGM data...</div>
   {:else}
-    <div class="analysis-info">
-      <h2>BGM Analysis Results</h2>
-      <p><strong>Bayesian Graphical Model</strong> for detecting correlated evolution between sites.</p>
-    </div>
+    {#key dataKey}
+      <div class="analysis-info">
+        <h2>BGM Analysis Results</h2>
+        <p><strong>Bayesian Graphical Model</strong> for detecting correlated evolution between sites.</p>
+      </div>
 
-    {#if summary}
-      <div class="summary-tiles">
+      {#if summary}
+        <div class="summary-tiles">
         <div class="tile">
           <div class="tile-number">{summary.sequences}</div>
           <div class="tile-description">Sequences</div>
@@ -202,10 +198,11 @@
       <div class="plot-container" bind:this={correlationContainer}></div>
     </div>
 
-    <div class="citation">
-      <h3>Citation</h3>
-      <code>Poon AFY, Lewis FI, Pond SLK, Frost SDW. An evolutionary-network model reveals stratified interactions in the V3 loop of the HIV-1 envelope. PLoS Comput Biol. 2007;3(11):e231.</code>
-    </div>
+      <div class="citation">
+        <h3>Citation</h3>
+        <code>Poon AFY, Lewis FI, Pond SLK, Frost SDW. An evolutionary-network model reveals stratified interactions in the V3 loop of the HIV-1 envelope. PLoS Comput Biol. 2007;3(11):e231.</code>
+      </div>
+    {/key}
   {/if}
 </div>
 
