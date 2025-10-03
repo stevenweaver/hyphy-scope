@@ -4,6 +4,27 @@
 
   export let data: any;
 
+  // DEBUG: Version check for cache issues
+  console.log('🧨 BUSTED Visualization loaded - Version with debug messaging (Cache Test)');
+  console.log('🧨 BUSTED: Received data:', data ? 'Data present' : 'No data');
+  
+  // Force reactivity by creating a local copy that Svelte will track
+  let localData = null;
+
+  // Create a reactive key that changes when data changes
+  $: dataKey = data ? JSON.stringify(data).substring(0, 100) : "";
+
+  // Watch for data changes and create new reference
+  $: if (data) {
+    // Deep clone to ensure new reference and trigger reactivity
+    localData = JSON.parse(JSON.stringify(data));
+    console.log('🧨 BUSTED: Data updated, created new localData reference');
+    console.log('🧨 BUSTED: Data structure keys:', Object.keys(data));
+  } else {
+    localData = null;
+    console.log('🧨 BUSTED: No data provided');
+  }
+
   // Interfaces
   interface BustedSiteData {
     site: number;
@@ -24,10 +45,33 @@
     branchesTestedCount: number;
   }
 
-  // Reactive data processing
-  $: summary = data ? getBustedSummary(data) : null;
-  $: siteData = data ? getBustedSiteData(data) : [];
-  $: distributionData = data ? getDistributionData(data) : null;
+  // Reactive data processing with error handling - using localData instead of prop
+  $: summary = localData ? (function() {
+    try {
+      return getBustedSummary(localData);
+    } catch (e) {
+      console.error('Error processing BUSTED summary:', e);
+      return null;
+    }
+  })() : null;
+  
+  $: siteData = localData ? (function() {
+    try {
+      return getBustedSiteData(localData);
+    } catch (e) {
+      console.error('Error processing BUSTED site data:', e);
+      return [];
+    }
+  })() : [];
+  
+  $: distributionData = localData ? (function() {
+    try {
+      return getDistributionData(localData);
+    } catch (e) {
+      console.error('Error processing BUSTED distribution data:', e);
+      return null;
+    }
+  })() : null;
 
   // Controls
   let evidenceThreshold = 100;
@@ -73,15 +117,22 @@
     const testResults = data['test results'];
     const fits = data.fits;
     
+    // Handle different model naming conventions
+    const baselineModel = fits?.['Baseline MG94xREV'] || 
+                         fits?.['MG94xREV with separate rates for branch sets'] ||
+                         fits?.['Nucleotide GTR'];
+    const alternativeModel = fits?.['Alternative model'] || 
+                            fits?.['Unconstrained model'];
+    
     return {
-      sequences: data.input?.sequences || 0,
-      sites: data.input?.sites || 0,
+      sequences: data.input?.['number of sequences'] || data.input?.sequences || 0,
+      sites: data.input?.['number of sites'] || data.input?.sites || 0,
       pValue: testResults?.['p-value'] || 1,
-      testStatistic: testResults?.['test statistic'] || 0,
-      baselineLogL: fits?.['Baseline MG94xREV']?.['log-likelihood'] || 0,
-      alternativeLogL: fits?.['Alternative model']?.['log-likelihood'] || 0,
+      testStatistic: testResults?.['test statistic'] || testResults?.['LRT'] || 0,
+      baselineLogL: baselineModel?.['log-likelihood'] || 0,
+      alternativeLogL: alternativeModel?.['log-likelihood'] || 0,
       hasSelection: (testResults?.['p-value'] || 1) <= 0.05,
-      branchesTestedCount: data.tested?.length || 0
+      branchesTestedCount: data.tested ? Object.keys(data.tested).length : 0
     };
   }
 
@@ -89,13 +140,56 @@
     const evidenceRatios = data['Evidence Ratios'];
     const synonymousRates = data['Synonymous site-posteriors'];
     
-    if (!evidenceRatios) return [];
+    // Handle empty Evidence Ratios object
+    if (!evidenceRatios || Object.keys(evidenceRatios).length === 0) {
+      // If no evidence ratios, create dummy data for each site
+      const numSites = data.input?.['number of sites'] || data.input?.sites || 0;
+      if (numSites === 0) return [];
+      
+      return Array.from({length: numSites}, (_, i) => {
+        const site = i + 1;
+        // Handle synonymous rates as 2D array vs object
+        let synRate = 0;
+        if (synonymousRates) {
+          if (Array.isArray(synonymousRates) && synonymousRates.length > 0) {
+            // Average across rate categories for this site
+            synRate = synonymousRates.reduce((sum, rateCategory) => {
+              const siteRate = Array.isArray(rateCategory) ? (rateCategory[i] || 0) : 0;
+              return sum + siteRate;
+            }, 0) / synonymousRates.length;
+          } else {
+            synRate = synonymousRates[site] || 0;
+          }
+        }
+        
+        return {
+          site,
+          partition: 1,
+          'Evidence Ratio': 0,
+          'Synonymous Rate': synRate,
+          'Selection': getSelectionCategory(0)
+        };
+      });
+    }
     
     const sites = Object.keys(evidenceRatios).map(Number).sort((a, b) => a - b);
     
     return sites.map(site => {
       const evidence = evidenceRatios[site] || 0;
-      const synRate = synonymousRates?.[site] || 0;
+      
+      // Handle synonymous rates as 2D array vs object
+      let synRate = 0;
+      if (synonymousRates) {
+        if (Array.isArray(synonymousRates) && synonymousRates.length > 0) {
+          // Average across rate categories for this site
+          synRate = synonymousRates.reduce((sum, rateCategory) => {
+            const siteRate = Array.isArray(rateCategory) ? (rateCategory[site - 1] || 0) : 0;
+            return sum + siteRate;
+          }, 0) / synonymousRates.length;
+        } else {
+          synRate = synonymousRates[site] || 0;
+        }
+      }
       
       return {
         site,
@@ -111,8 +205,12 @@
     const fits = data.fits;
     if (!fits) return null;
 
-    const baseline = fits['Baseline MG94xREV'];
-    const alternative = fits['Alternative model'];
+    // Handle different model naming conventions
+    const baseline = fits['Baseline MG94xREV'] || 
+                    fits['MG94xREV with separate rates for branch sets'] ||
+                    fits['Nucleotide GTR'];
+    const alternative = fits['Alternative model'] || 
+                       fits['Unconstrained model'];
 
     return {
       baseline: {

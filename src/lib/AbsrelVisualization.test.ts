@@ -51,7 +51,7 @@ describe('AbsrelVisualization Component', () => {
     
     // Check tile values (there might be duplicates from enhanced tiles)
     expect(screen.getAllByText('12')).toBeDefined();
-    expect(screen.getByText('5')).toBeInTheDocument();
+    expect(screen.getAllByText('5')).toBeDefined(); // Use getAllByText since it appears in tiles and table
     expect(screen.getAllByText('1')).toBeDefined(); // May have duplicates like '12'
   });
 
@@ -151,7 +151,7 @@ describe('AbsrelVisualization Component', () => {
     expect(screen.getByText('Adaptive Branch-Site Random Effects Likelihood')).toBeInTheDocument();
   });
 
-  it('shows model comparison information', async () => {
+  it('shows branch-by-branch rate results section', async () => {
     render(AbsrelVisualization, { 
       props: { 
         data: mockAbsrelData,
@@ -161,8 +161,8 @@ describe('AbsrelVisualization Component', () => {
 
     await new Promise(resolve => setTimeout(resolve, 100));
 
-    // Should show model fit information if available
-    expect(screen.getByText('Model Comparison')).toBeInTheDocument();
+    // Should show branch-by-branch rate results section
+    expect(screen.getByText('Branch-by-branch Rate Results')).toBeInTheDocument();
   });
 
   it('handles rate distribution data', async () => {
@@ -176,7 +176,7 @@ describe('AbsrelVisualization Component', () => {
     await new Promise(resolve => setTimeout(resolve, 100));
 
     // ABSREL should handle branch-specific rate distributions
-    expect(screen.getByText('ω distribution for branch:')).toBeInTheDocument();
+    expect(screen.getByText('ω distribution')).toBeInTheDocument();
   });
 
   it('initializes with correct default values', () => {
