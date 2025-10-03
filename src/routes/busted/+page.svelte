@@ -60,7 +60,8 @@
     try {
       loading = true;
       error = '';
-      bustedData = await loadDataFromStorage(file);
+      const text = await file.text();
+      bustedData = JSON.parse(text);
     } catch (e) {
       error = `Failed to load file: ${e.message}`;
       bustedData = null;
