@@ -771,13 +771,32 @@
     }
   }
 
+  function getTreeNewick(data: any): string | null {
+    if (!data?.input?.trees) return null;
+
+    const trees = data.input.trees;
+
+    // Handle different tree storage formats
+    if (Array.isArray(trees)) {
+      return trees[0] || null;
+    } else if (typeof trees === 'object' && trees !== null) {
+      const treeKeys = Object.keys(trees);
+      const treeKey = treeKeys[0];
+      return trees[treeKey] || null;
+    } else if (typeof trees === 'string') {
+      return trees;
+    }
+
+    return null;
+  }
+
   function renderBustedTree() {
     if (!data?.input?.trees || !treeContainer) return;
 
     try {
       // Get the Newick string
-      const newick = data.input.trees;
-      if (!newick || newick.trim() === '') {
+      const newick = getTreeNewick(data);
+      if (!newick || typeof newick !== 'string' || newick.trim() === '') {
         treeContainer.innerHTML = '<p>No tree data found</p>';
         return;
       }
