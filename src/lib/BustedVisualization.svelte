@@ -21,11 +21,14 @@
 
   // Interfaces
   interface BustedSiteData {
-    site: number;
-    partition: number;
-    'Evidence Ratio': number;
-    'Synonymous Rate': number;
-    'Selection': string;
+    Partition: number;
+    Codon: number;
+    'ER (constrained)': number | null;
+    'ER (optimized null)': number | null;
+    'SRV posterior mean': number | null;
+    'SRV viterbi': number | null;
+    logL: number | null;
+    LR: number | null;
   }
 
   interface BustedSummary {
@@ -57,7 +60,7 @@
   let showInternal = false;
 
   // Sorting and pagination
-  let sortColumn = 'Evidence Ratio';
+  let sortColumn = 'ER (constrained)';
   let sortDirection: 'asc' | 'desc' = 'desc';
   let currentPage = 1;
   let itemsPerPage = 50;
@@ -142,43 +145,89 @@
   function getBustedSiteData(data: any): BustedSiteData[] {
     const evidenceRatios = data['Evidence Ratios'];
     const synonymousRates = data['Synonymous site-posteriors'];
+    const siteLogL = data['Site Log Likelihood'];
+    const viterbiPath = data['Viterbi synonymous rate path'];
+    const partitions = data['data partitions'];
 
-    // Evidence Ratios structure: { 'constrained': [[er1, er2, ...]], 'optimized null': [[...]] }
-    // Get the constrained evidence ratios array
-    let erArray = null;
-    if (evidenceRatios) {
-      if (evidenceRatios['constrained'] && Array.isArray(evidenceRatios['constrained'][0])) {
-        erArray = evidenceRatios['constrained'][0];
-      } else if (evidenceRatios['optimized null'] && Array.isArray(evidenceRatios['optimized null'][0])) {
-        erArray = evidenceRatios['optimized null'][0];
-      }
+    // Get evidence ratio arrays
+    const erConstrained = evidenceRatios?.['constrained']?.[0] || null;
+    const erOptimizedNull = evidenceRatios?.['optimized null']?.[0] || null;
+    const logLUnconstrained = siteLogL?.['unconstrained']?.[0] || null;
+    const viterbiValues = viterbiPath?.[0] || null;
+
+    // Build site index to partition/codon mapping
+    const siteIndexPartitionCodon: [number, number][] = [];
+    if (partitions) {
+      Object.values(partitions).forEach((pinfo: any, partitionIdx) => {
+        if (pinfo?.coverage?.[0]) {
+          pinfo.coverage[0].forEach((_: any, codonIdx: number) => {
+            siteIndexPartitionCodon.push([partitionIdx + 1, codonIdx + 1]);
+          });
+        }
+      });
     }
 
     // Determine number of sites
-    const numSites = erArray ? erArray.length : (data.input?.['number of sites'] || data.input?.sites || 0);
+    const numSites = erConstrained?.length || erOptimizedNull?.length ||
+                     logLUnconstrained?.length || (data.input?.['number of sites'] || data.input?.sites || 0);
 
     if (numSites === 0) return [];
 
-    return Array.from({length: numSites}, (_, i) => {
-      const site = i + 1;
-      const evidence = erArray ? (erArray[i] || 0) : 0;
+    // Calculate SRV distribution for posterior mean
+    const srvDistribution: any[] = [];
+    if (synonymousRates && Array.isArray(synonymousRates) && synonymousRates.length > 0) {
+      // Build distribution from rate categories
+      const numCategories = synonymousRates.length;
+      for (let cat = 0; cat < numCategories; cat++) {
+        srvDistribution.push({
+          value: cat,
+          weight: 1 / numCategories // Default uniform weights, could be refined
+        });
+      }
+    }
 
-      // Handle synonymous rates as 2D array
-      let synRate = 0;
+    return Array.from({length: numSites}, (_, i) => {
+      // Get partition and codon
+      const partCodon = siteIndexPartitionCodon[i] || [1, i + 1];
+
+      // Calculate SRV posterior mean
+      let srvPosteriorMean: number | null = null;
       if (synonymousRates && Array.isArray(synonymousRates) && synonymousRates.length > 0) {
-        // Average across rate categories for this site
-        synRate = synonymousRates.reduce((sum, rateCategory) => {
+        let sum = 0;
+        let totalWeight = 0;
+        synonymousRates.forEach((rateCategory, catIdx) => {
           const siteRate = Array.isArray(rateCategory) ? (rateCategory[i] || 0) : 0;
-          return sum + siteRate;
-        }, 0) / synonymousRates.length;
+          const weight = srvDistribution[catIdx]?.weight || 0;
+          sum += siteRate * weight;
+          totalWeight += weight;
+        });
+        srvPosteriorMean = totalWeight > 0 ? sum / totalWeight : null;
+      }
+
+      // Get SRV viterbi value
+      let srvViterbi: number | null = null;
+      if (viterbiValues && srvDistribution.length > 0) {
+        const viterbiIdx = viterbiValues[i];
+        if (viterbiIdx !== undefined && srvDistribution[viterbiIdx]) {
+          srvViterbi = srvDistribution[viterbiIdx].value;
+        }
+      }
+
+      // Calculate LR from optimized null ER
+      let lr: number | null = null;
+      if (erOptimizedNull && erOptimizedNull[i] > 0) {
+        lr = 2 * Math.log(erOptimizedNull[i]);
       }
 
       return {
-        site,
-        partition: 1,
-        'Evidence Ratio': evidence,
-        'Synonymous Rate': synRate,
-        'Selection': getSelectionCategory(evidence)
+        Partition: partCodon[0],
+        Codon: partCodon[1],
+        'ER (constrained)': erConstrained ? erConstrained[i] : null,
+        'ER (optimized null)': erOptimizedNull ? erOptimizedNull[i] : null,
+        'SRV posterior mean': srvPosteriorMean,
+        'SRV viterbi': srvViterbi,
+        logL: logLUnconstrained ? logLUnconstrained[i] : null,
+        LR: lr
       };
     });
   }
@@ -292,30 +341,20 @@
     return 0;
   }
 
-  function getSelectionCategory(evidenceRatio: number): string {
-    if (evidenceRatio >= 100) return 'Strong Positive';
-    if (evidenceRatio >= 10) return 'Moderate Positive';
-    if (evidenceRatio >= 3) return 'Weak Positive';
-    return 'Neutral/Purifying';
-  }
-
-  function getSelectionColor(selection: string): string {
-    switch (selection) {
-      case 'Strong Positive': return '#e3243b';
-      case 'Moderate Positive': return '#ff6b35';
-      case 'Weak Positive': return '#ffa500';
-      default: return '#666';
-    }
-  }
 
   // Plotting Functions
   function createEvidenceRatioPlot(data: BustedSiteData[]): any {
     if (!data.length) return null;
 
-    const cappedData = data.map(d => ({
-      ...d,
-      cappedRatio: Math.min(d['Evidence Ratio'], 1000)
-    }));
+    const cappedData = data.map(d => {
+      // Use optimized null ER if available, otherwise constrained
+      const er = d['ER (optimized null)'] ?? d['ER (constrained)'] ?? 0;
+      return {
+        ...d,
+        cappedRatio: Math.min(er, 1000),
+        evidenceRatio: er
+      };
+    });
 
     return Plot.plot({
       title: "Evidence Ratios for Positive Selection",
@@ -324,17 +363,13 @@
       height: 300,
       marginLeft: 60,
       x: {
-        label: "Site",
+        label: "Codon",
         grid: true
       },
       y: {
         label: "Evidence Ratio (capped at 1000)",
-        grid: true
-      },
-      color: {
-        type: "ordinal",
-        domain: ["Strong Positive", "Moderate Positive", "Weak Positive", "Neutral/Purifying"],
-        range: ["#e3243b", "#ff6b35", "#ffa500", "#666"]
+        grid: true,
+        type: "log"
       },
       marks: [
         // Threshold lines
@@ -344,16 +379,21 @@
         
         // Points
         Plot.dot(cappedData, {
-          x: "site",
+          x: "Codon",
           y: "cappedRatio",
-          fill: "Selection",
+          fill: d => {
+            if (d.evidenceRatio >= 100) return "#e3243b";
+            if (d.evidenceRatio >= 10) return "#ff6b35";
+            if (d.evidenceRatio >= 3) return "#ffa500";
+            return "#666";
+          },
           r: 3,
-          title: d => `Site ${d.site}\nEvidence Ratio: ${d['Evidence Ratio'].toFixed(2)}\nCategory: ${d.Selection}`
+          title: d => `Codon ${d.Codon}\nEvidence Ratio: ${d.evidenceRatio.toFixed(2)}`
         }),
-        
+
         // Line
         Plot.line(cappedData, {
-          x: "site",
+          x: "Codon",
           y: "cappedRatio",
           stroke: "#999",
           strokeWidth: 1
@@ -365,34 +405,38 @@
   function createSynonymousRatePlot(data: BustedSiteData[]): any {
     if (!data.length) return null;
 
+    // Filter out null values for plotting
+    const validData = data.filter(d => d['SRV posterior mean'] !== null);
+    if (validData.length === 0) return null;
+
     return Plot.plot({
       title: "Synonymous Substitution Rates",
-      subtitle: "Rate of synonymous substitutions across sites",
+      subtitle: "Posterior mean of synonymous rate across sites",
       width: 1000,
       height: 300,
       marginLeft: 60,
       x: {
-        label: "Site",
+        label: "Codon",
         grid: true
       },
       y: {
-        label: "Synonymous Rate",
+        label: "SRV Posterior Mean (α)",
         grid: true
       },
       marks: [
-        Plot.line(data, {
-          x: "site",
-          y: "Synonymous Rate",
+        Plot.line(validData, {
+          x: "Codon",
+          y: "SRV posterior mean",
           stroke: "#1f77b4",
           strokeWidth: 2
         }),
-        
-        Plot.dot(data.filter((d, i) => i % 20 === 0), {
-          x: "site",
-          y: "Synonymous Rate",
+
+        Plot.dot(validData.filter((d, i) => i % 20 === 0), {
+          x: "Codon",
+          y: "SRV posterior mean",
           fill: "#1f77b4",
           r: 3,
-          title: d => `Site ${d.site}\nSynonymous Rate: ${d['Synonymous Rate'].toFixed(4)}`
+          title: d => `Codon ${d.Codon}\nSRV Posterior Mean: ${d['SRV posterior mean']?.toFixed(4) || 'N/A'}`
         })
       ]
     });
@@ -885,22 +929,33 @@
   }
 
   function formatValue(value: any, column: string): string {
+    if (value === null || value === undefined) return 'N/A';
     if (typeof value !== 'number') return String(value);
-    
-    if (column === 'Evidence Ratio') {
+
+    if (column === 'ER (constrained)' || column === 'ER (optimized null)') {
       return value < 0.001 ? value.toExponential(2) : value.toFixed(2);
     }
-    if (column === 'Synonymous Rate') {
+    if (column === 'SRV posterior mean' || column === 'SRV viterbi') {
       return value.toFixed(4);
+    }
+    if (column === 'logL' || column === 'LR') {
+      return value.toFixed(2);
+    }
+    if (column === 'Partition' || column === 'Codon') {
+      return value.toString();
     }
     return value.toString();
   }
 
   const tableHeaders = [
-    { key: 'site', label: 'Site', sortable: true },
-    { key: 'Evidence Ratio', label: 'Evidence Ratio', sortable: true },
-    { key: 'Synonymous Rate', label: 'Synonymous Rate', sortable: true },
-    { key: 'Selection', label: 'Selection Category', sortable: true }
+    { key: 'Partition', label: 'Partition', sortable: true },
+    { key: 'Codon', label: 'Codon', sortable: true },
+    { key: 'ER (constrained)', label: 'ER (ω>1, constr.)', sortable: true },
+    { key: 'ER (optimized null)', label: 'ER (ω>1, optim.)', sortable: true },
+    { key: 'SRV posterior mean', label: 'E_post[α]', sortable: true },
+    { key: 'SRV viterbi', label: 'α', sortable: true },
+    { key: 'logL', label: 'log(L)', sortable: true },
+    { key: 'LR', label: 'LR', sortable: true }
   ];
 </script>
 
