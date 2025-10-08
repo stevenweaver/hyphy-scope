@@ -95,8 +95,16 @@
     // Count sites with Evidence Ratio >= 10
     const evidenceRatios = data['Evidence Ratios'];
     let sitesWithHighER = 0;
-    if (evidenceRatios && evidenceRatios.constrained) {
-      sitesWithHighER = evidenceRatios.constrained[0]?.filter((ratio: number) => ratio >= 10).length || 0;
+    if (evidenceRatios) {
+      let erArray = null;
+      if (evidenceRatios['constrained'] && Array.isArray(evidenceRatios['constrained'][0])) {
+        erArray = evidenceRatios['constrained'][0];
+      } else if (evidenceRatios['optimized null'] && Array.isArray(evidenceRatios['optimized null'][0])) {
+        erArray = evidenceRatios['optimized null'][0];
+      }
+      if (erArray) {
+        sitesWithHighER = erArray.filter((ratio: number) => ratio >= 10).length;
+      }
     }
     
     return {
@@ -116,58 +124,37 @@
   function getBustedSiteData(data: any): BustedSiteData[] {
     const evidenceRatios = data['Evidence Ratios'];
     const synonymousRates = data['Synonymous site-posteriors'];
-    
-    // Handle empty Evidence Ratios object
-    if (!evidenceRatios || Object.keys(evidenceRatios).length === 0) {
-      // If no evidence ratios, create dummy data for each site
-      const numSites = data.input?.['number of sites'] || data.input?.sites || 0;
-      if (numSites === 0) return [];
-      
-      return Array.from({length: numSites}, (_, i) => {
-        const site = i + 1;
-        // Handle synonymous rates as 2D array vs object
-        let synRate = 0;
-        if (synonymousRates) {
-          if (Array.isArray(synonymousRates) && synonymousRates.length > 0) {
-            // Average across rate categories for this site
-            synRate = synonymousRates.reduce((sum, rateCategory) => {
-              const siteRate = Array.isArray(rateCategory) ? (rateCategory[i] || 0) : 0;
-              return sum + siteRate;
-            }, 0) / synonymousRates.length;
-          } else {
-            synRate = synonymousRates[site] || 0;
-          }
-        }
-        
-        return {
-          site,
-          partition: 1,
-          'Evidence Ratio': 0,
-          'Synonymous Rate': synRate,
-          'Selection': getSelectionCategory(0)
-        };
-      });
-    }
-    
-    const sites = Object.keys(evidenceRatios).map(Number).sort((a, b) => a - b);
-    
-    return sites.map(site => {
-      const evidence = evidenceRatios[site] || 0;
-      
-      // Handle synonymous rates as 2D array vs object
-      let synRate = 0;
-      if (synonymousRates) {
-        if (Array.isArray(synonymousRates) && synonymousRates.length > 0) {
-          // Average across rate categories for this site
-          synRate = synonymousRates.reduce((sum, rateCategory) => {
-            const siteRate = Array.isArray(rateCategory) ? (rateCategory[site - 1] || 0) : 0;
-            return sum + siteRate;
-          }, 0) / synonymousRates.length;
-        } else {
-          synRate = synonymousRates[site] || 0;
-        }
+
+    // Evidence Ratios structure: { 'constrained': [[er1, er2, ...]], 'optimized null': [[...]] }
+    // Get the constrained evidence ratios array
+    let erArray = null;
+    if (evidenceRatios) {
+      if (evidenceRatios['constrained'] && Array.isArray(evidenceRatios['constrained'][0])) {
+        erArray = evidenceRatios['constrained'][0];
+      } else if (evidenceRatios['optimized null'] && Array.isArray(evidenceRatios['optimized null'][0])) {
+        erArray = evidenceRatios['optimized null'][0];
       }
-      
+    }
+
+    // Determine number of sites
+    const numSites = erArray ? erArray.length : (data.input?.['number of sites'] || data.input?.sites || 0);
+
+    if (numSites === 0) return [];
+
+    return Array.from({length: numSites}, (_, i) => {
+      const site = i + 1;
+      const evidence = erArray ? (erArray[i] || 0) : 0;
+
+      // Handle synonymous rates as 2D array
+      let synRate = 0;
+      if (synonymousRates && Array.isArray(synonymousRates) && synonymousRates.length > 0) {
+        // Average across rate categories for this site
+        synRate = synonymousRates.reduce((sum, rateCategory) => {
+          const siteRate = Array.isArray(rateCategory) ? (rateCategory[i] || 0) : 0;
+          return sum + siteRate;
+        }, 0) / synonymousRates.length;
+      }
+
       return {
         site,
         partition: 1,
