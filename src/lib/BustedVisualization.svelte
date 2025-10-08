@@ -25,7 +25,6 @@
     Codon: number;
     'ER (constrained)': number | null;
     'ER (optimized null)': number | null;
-    'SRV posterior mean': number | null;
     logL: number | null;
     LR: number | null;
   }
@@ -89,7 +88,6 @@
 
   // Plot containers
   let evidenceRatioContainer: HTMLDivElement;
-  let synonymousRateContainer: HTMLDivElement;
   let distributionContainer: HTMLDivElement;
   let alignmentWideContainer: HTMLDivElement;
   let discretePlotContainers: { [key: string]: HTMLDivElement } = {};
@@ -143,7 +141,6 @@
 
   function getBustedSiteData(data: any): BustedSiteData[] {
     const evidenceRatios = data['Evidence Ratios'];
-    const synonymousRates = data['Synonymous site-posteriors'];
     const siteLogL = data['Site Log Likelihood'];
     const partitions = data['data partitions'];
 
@@ -170,36 +167,9 @@
 
     if (numSites === 0) return [];
 
-    // Calculate SRV distribution for posterior mean
-    const srvDistribution: any[] = [];
-    if (synonymousRates && Array.isArray(synonymousRates) && synonymousRates.length > 0) {
-      // Build distribution from rate categories
-      const numCategories = synonymousRates.length;
-      for (let cat = 0; cat < numCategories; cat++) {
-        srvDistribution.push({
-          value: cat,
-          weight: 1 / numCategories // Default uniform weights, could be refined
-        });
-      }
-    }
-
     return Array.from({length: numSites}, (_, i) => {
       // Get partition and codon
       const partCodon = siteIndexPartitionCodon[i] || [1, i + 1];
-
-      // Calculate SRV posterior mean
-      let srvPosteriorMean: number | null = null;
-      if (synonymousRates && Array.isArray(synonymousRates) && synonymousRates.length > 0) {
-        let sum = 0;
-        let totalWeight = 0;
-        synonymousRates.forEach((rateCategory, catIdx) => {
-          const siteRate = Array.isArray(rateCategory) ? (rateCategory[i] || 0) : 0;
-          const weight = srvDistribution[catIdx]?.weight || 0;
-          sum += siteRate * weight;
-          totalWeight += weight;
-        });
-        srvPosteriorMean = totalWeight > 0 ? sum / totalWeight : null;
-      }
 
       // Calculate LR from optimized null ER
       let lr: number | null = null;
@@ -212,7 +182,6 @@
         Codon: partCodon[1],
         'ER (constrained)': erConstrained ? erConstrained[i] : null,
         'ER (optimized null)': erOptimizedNull ? erOptimizedNull[i] : null,
-        'SRV posterior mean': srvPosteriorMean,
         logL: logLUnconstrained ? logLUnconstrained[i] : null,
         LR: lr
       };
@@ -389,45 +358,6 @@
     });
   }
 
-  function createSynonymousRatePlot(data: BustedSiteData[]): any {
-    if (!data.length) return null;
-
-    // Filter out null values for plotting
-    const validData = data.filter(d => d['SRV posterior mean'] !== null);
-    if (validData.length === 0) return null;
-
-    return Plot.plot({
-      title: "Synonymous Substitution Rates",
-      subtitle: "Posterior mean of synonymous rate across sites",
-      width: 1000,
-      height: 300,
-      marginLeft: 60,
-      x: {
-        label: "Codon",
-        grid: true
-      },
-      y: {
-        label: "SRV Posterior Mean (α)",
-        grid: true
-      },
-      marks: [
-        Plot.line(validData, {
-          x: "Codon",
-          y: "SRV posterior mean",
-          stroke: "#1f77b4",
-          strokeWidth: 2
-        }),
-
-        Plot.dot(validData.filter((d, i) => i % 20 === 0), {
-          x: "Codon",
-          y: "SRV posterior mean",
-          fill: "#1f77b4",
-          r: 3,
-          title: d => `Codon ${d.Codon}\nSRV Posterior Mean: ${d['SRV posterior mean']?.toFixed(4) || 'N/A'}`
-        })
-      ]
-    });
-  }
 
   function createDistributionPlot(distData: any): any {
     if (!distData) return null;
@@ -751,19 +681,11 @@
   }
 
   function renderPlots() {
-    if (evidenceRatioContainer && (selectedVisualization === 'evidence' || selectedVisualization === 'all')) {
+    if (evidenceRatioContainer && selectedVisualization === 'evidence') {
       const plot = createEvidenceRatioPlot(siteData);
       if (plot) {
         evidenceRatioContainer.innerHTML = '';
         evidenceRatioContainer.appendChild(plot);
-      }
-    }
-
-    if (synonymousRateContainer && (selectedVisualization === 'synonymous' || selectedVisualization === 'all')) {
-      const plot = createSynonymousRatePlot(siteData);
-      if (plot) {
-        synonymousRateContainer.innerHTML = '';
-        synonymousRateContainer.appendChild(plot);
       }
     }
 
@@ -922,9 +844,6 @@
     if (column === 'ER (constrained)' || column === 'ER (optimized null)') {
       return value < 0.001 ? value.toExponential(2) : value.toFixed(2);
     }
-    if (column === 'SRV posterior mean') {
-      return value.toFixed(4);
-    }
     if (column === 'logL' || column === 'LR') {
       return value.toFixed(2);
     }
@@ -939,7 +858,6 @@
     { key: 'Codon', label: 'Codon', sortable: true },
     { key: 'ER (constrained)', label: 'ER (ω>1, constr.)', sortable: true },
     { key: 'ER (optimized null)', label: 'ER (ω>1, optim.)', sortable: true },
-    { key: 'SRV posterior mean', label: 'E_post[α]', sortable: true },
     { key: 'logL', label: 'log(L)', sortable: true },
     { key: 'LR', label: 'LR', sortable: true }
   ];
@@ -1036,8 +954,6 @@
         <label for="visualization-type">Show plots:</label>
         <select id="visualization-type" bind:value={selectedVisualization}>
           <option value="evidence">Evidence Ratios</option>
-          <option value="synonymous">Synonymous Rates</option>
-          <option value="all">All Plots</option>
         </select>
       </div>
     </div>
@@ -1172,7 +1088,7 @@
     </div>
 
     <!-- Evidence Ratio Plot -->
-    {#if selectedVisualization === 'evidence' || selectedVisualization === 'all'}
+    {#if selectedVisualization === 'evidence'}
       <div class="plot-section">
         <h3>Evidence Ratios for Positive Selection</h3>
         <p class="plot-description">
@@ -1180,17 +1096,6 @@
           Thresholds: Strong (≥100), Moderate (≥10), Weak (≥3).
         </p>
         <div class="plot-container" bind:this={evidenceRatioContainer}></div>
-      </div>
-    {/if}
-
-    <!-- Synonymous Rate Plot -->
-    {#if selectedVisualization === 'synonymous' || selectedVisualization === 'all'}
-      <div class="plot-section">
-        <h3>Synonymous Substitution Rates</h3>
-        <p class="plot-description">
-          Rate of synonymous substitutions across sites, indicating background mutation rate.
-        </p>
-        <div class="plot-container" bind:this={synonymousRateContainer}></div>
       </div>
     {/if}
 
