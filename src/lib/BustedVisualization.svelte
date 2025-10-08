@@ -1,7 +1,15 @@
+<svelte:head>
+  <link
+    rel="stylesheet"
+    href="https://cdn.jsdelivr.net/npm/phylotree@2.1.7/dist/phylotree.css"
+  />
+</svelte:head>
+
 <script lang="ts">
   import { onMount } from 'svelte';
   import * as Plot from "@observablehq/plot";
   import * as d3 from 'd3';
+  import { phylotree } from 'phylotree';
 
   export let data: any;
 
@@ -39,6 +47,15 @@
   let showOnlySignificant = false;
   let selectedVisualization = 'evidence';
 
+  // Tree controls
+  let showTree = true;
+  let colorBranches = 'Tested';
+  let treeWidth = 800;
+  let treeHeight = 600;
+  let showScale = true;
+  let alignTips = false;
+  let showInternal = false;
+
   // Sorting and pagination
   let sortColumn = 'Evidence Ratio';
   let sortDirection: 'asc' | 'desc' = 'desc';
@@ -74,6 +91,7 @@
   let distributionContainer: HTMLDivElement;
   let alignmentWideContainer: HTMLDivElement;
   let discretePlotContainers: { [key: string]: HTMLDivElement } = {};
+  let treeContainer: HTMLDivElement;
 
   // Utility Functions
   function getBustedSummary(data: any): BustedSummary {
@@ -696,6 +714,11 @@
     renderPlots();
   }
 
+  // Re-render tree when parameters change
+  $: if (mounted && data && showTree && (colorBranches || treeWidth || treeHeight || showScale || alignTips || showInternal)) {
+    renderBustedTree();
+  }
+
   function renderPlots() {
     if (evidenceRatioContainer && (selectedVisualization === 'evidence' || selectedVisualization === 'all')) {
       const plot = createEvidenceRatioPlot(siteData);
@@ -745,6 +768,82 @@
           }
         }
       });
+    }
+  }
+
+  function renderBustedTree() {
+    if (!data?.input?.trees || !treeContainer) return;
+
+    try {
+      // Clear previous tree
+      treeContainer.innerHTML = '';
+
+      // Get the Newick string
+      const newick = data.input.trees;
+      if (!newick) return;
+
+      // Create phylotree instance
+      const tree = new phylotree(newick);
+
+      if (!tree) {
+        treeContainer.innerHTML = '<p>Failed to create tree from data</p>';
+        return;
+      }
+
+      // Render the tree
+      const renderedTree = tree.render({
+        height: treeHeight,
+        width: treeWidth,
+        'align-tips': alignTips,
+        'selectable': false,
+        'show-scale': showScale,
+        'is-radial': false,
+        'left-right-spacing': 'fit-to-size',
+        'top-bottom-spacing': 'fit-to-size',
+        'node_circle_size': () => 0,
+        'internal-names': showInternal
+      });
+
+      if (!renderedTree) {
+        treeContainer.innerHTML = '<p>Failed to render tree</p>';
+        return;
+      }
+
+      // Apply branch coloring based on selected option
+      if (colorBranches === 'Tested') {
+        const tested = data.tested || {};
+        renderedTree.style_edges((element, node) => {
+          const branchName = node.target?.data?.name;
+          if (branchName && tested[branchName] === 'test') {
+            element.style('stroke', 'firebrick').style('stroke-width', '3px');
+          } else {
+            element.style('stroke', null).style('stroke-width', null);
+          }
+        });
+      }
+
+      // Style nodes to use monospace font
+      if (renderedTree && typeof renderedTree.style_nodes === 'function') {
+        renderedTree.style_nodes((element, node) => {
+          element.selectAll('text').style('font-family', 'ui-monospace');
+          if (!node.children || !node.children.length) {
+            element.selectAll('title').data([node.data.name]).join('title').text(d => d);
+          }
+        });
+      }
+
+      // Add to container
+      if (renderedTree?.display && typeof renderedTree.display === 'function') {
+        const treeElement = renderedTree.display();
+        if (treeElement) {
+          treeContainer.appendChild(treeElement.node());
+        }
+      }
+    } catch (error) {
+      console.error('Error rendering BUSTED tree:', error);
+      if (treeContainer) {
+        treeContainer.innerHTML = '<p>Error rendering phylogenetic tree</p>';
+      }
     }
   }
 
@@ -934,6 +1033,63 @@
             <div class="plot-container" bind:this={alignmentWideContainer}></div>
           </div>
         </div>
+      </div>
+    {/if}
+
+    <!-- Phylogenetic Tree Visualization -->
+    {#if showTree && data?.input?.trees}
+      <div class="plot-section">
+        <h3>Phylogenetic Tree</h3>
+        <p class="plot-description">
+          Phylogenetic tree showing which branches were tested for positive selection.
+          Tested branches are highlighted in red.
+        </p>
+
+        <div class="tree-controls">
+          <div class="control-row">
+            <div class="control-group">
+              <label for="color-branches">Color branches:</label>
+              <select id="color-branches" bind:value={colorBranches}>
+                <option value="Tested">Tested branches</option>
+              </select>
+            </div>
+
+            <div class="control-group">
+              <label for="tree-width">Width:</label>
+              <input type="number" id="tree-width" bind:value={treeWidth} min="400" max="1200" step="50" />
+            </div>
+
+            <div class="control-group">
+              <label for="tree-height">Height:</label>
+              <input type="number" id="tree-height" bind:value={treeHeight} min="300" max="1000" step="50" />
+            </div>
+          </div>
+
+          <div class="control-row">
+            <div class="control-group">
+              <label>
+                <input type="checkbox" bind:checked={showScale} />
+                Show scale
+              </label>
+            </div>
+
+            <div class="control-group">
+              <label>
+                <input type="checkbox" bind:checked={alignTips} />
+                Align tips
+              </label>
+            </div>
+
+            <div class="control-group">
+              <label>
+                <input type="checkbox" bind:checked={showInternal} />
+                Show internal nodes
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <div class="tree-container" bind:this={treeContainer}></div>
       </div>
     {/if}
 
@@ -1457,6 +1613,40 @@
     align-items: center;
     justify-content: center;
     min-height: 200px;
+  }
+
+  .tree-controls {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+    padding: 1rem;
+    background: #f8f9fa;
+    border-radius: 4px;
+  }
+
+  .control-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1.5rem;
+    align-items: center;
+  }
+
+  .tree-container {
+    min-height: 400px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    padding: 1rem;
+    overflow: auto;
+    background: #fff;
+  }
+
+  :global(.phylotree-container) {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  }
+
+  :global(.phylotree-container text) {
+    font-family: ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, Consolas, 'DejaVu Sans Mono', monospace !important;
   }
 
   @media (max-width: 768px) {
