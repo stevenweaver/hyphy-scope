@@ -26,7 +26,6 @@
     'ER (constrained)': number | null;
     'ER (optimized null)': number | null;
     'SRV posterior mean': number | null;
-    'SRV viterbi': number | null;
     logL: number | null;
     LR: number | null;
   }
@@ -146,14 +145,12 @@
     const evidenceRatios = data['Evidence Ratios'];
     const synonymousRates = data['Synonymous site-posteriors'];
     const siteLogL = data['Site Log Likelihood'];
-    const viterbiPath = data['Viterbi synonymous rate path'];
     const partitions = data['data partitions'];
 
     // Get evidence ratio arrays
     const erConstrained = evidenceRatios?.['constrained']?.[0] || null;
     const erOptimizedNull = evidenceRatios?.['optimized null']?.[0] || null;
     const logLUnconstrained = siteLogL?.['unconstrained']?.[0] || null;
-    const viterbiValues = viterbiPath?.[0] || null;
 
     // Build site index to partition/codon mapping
     const siteIndexPartitionCodon: [number, number][] = [];
@@ -204,15 +201,6 @@
         srvPosteriorMean = totalWeight > 0 ? sum / totalWeight : null;
       }
 
-      // Get SRV viterbi value
-      let srvViterbi: number | null = null;
-      if (viterbiValues && srvDistribution.length > 0) {
-        const viterbiIdx = viterbiValues[i];
-        if (viterbiIdx !== undefined && srvDistribution[viterbiIdx]) {
-          srvViterbi = srvDistribution[viterbiIdx].value;
-        }
-      }
-
       // Calculate LR from optimized null ER
       let lr: number | null = null;
       if (erOptimizedNull && erOptimizedNull[i] > 0) {
@@ -225,7 +213,6 @@
         'ER (constrained)': erConstrained ? erConstrained[i] : null,
         'ER (optimized null)': erOptimizedNull ? erOptimizedNull[i] : null,
         'SRV posterior mean': srvPosteriorMean,
-        'SRV viterbi': srvViterbi,
         logL: logLUnconstrained ? logLUnconstrained[i] : null,
         LR: lr
       };
@@ -935,7 +922,7 @@
     if (column === 'ER (constrained)' || column === 'ER (optimized null)') {
       return value < 0.001 ? value.toExponential(2) : value.toFixed(2);
     }
-    if (column === 'SRV posterior mean' || column === 'SRV viterbi') {
+    if (column === 'SRV posterior mean') {
       return value.toFixed(4);
     }
     if (column === 'logL' || column === 'LR') {
@@ -953,7 +940,6 @@
     { key: 'ER (constrained)', label: 'ER (ω>1, constr.)', sortable: true },
     { key: 'ER (optimized null)', label: 'ER (ω>1, optim.)', sortable: true },
     { key: 'SRV posterior mean', label: 'E_post[α]', sortable: true },
-    { key: 'SRV viterbi', label: 'α', sortable: true },
     { key: 'logL', label: 'log(L)', sortable: true },
     { key: 'LR', label: 'LR', sortable: true }
   ];
