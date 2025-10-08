@@ -775,12 +775,12 @@
     if (!data?.input?.trees || !treeContainer) return;
 
     try {
-      // Clear previous tree
-      treeContainer.innerHTML = '';
-
       // Get the Newick string
       const newick = data.input.trees;
-      if (!newick) return;
+      if (!newick || newick.trim() === '') {
+        treeContainer.innerHTML = '<p>No tree data found</p>';
+        return;
+      }
 
       // Create phylotree instance
       const tree = new phylotree(newick);
@@ -790,37 +790,41 @@
         return;
       }
 
+      // Combined edge styler function
+      function edgeStyler(element, data) {
+        try {
+          if (colorBranches === 'Tested') {
+            const tested = data?.tested || {};
+            const branchName = data.target?.data?.name;
+            if (branchName && tested[branchName] === 'test') {
+              element.style('stroke', 'firebrick').style('stroke-width', '3px');
+            }
+          }
+        } catch (e) {
+          console.error('Error in edgeStyler:', e);
+        }
+      }
+
       // Render the tree
       const renderedTree = tree.render({
+        container: '.tree-container',
         height: treeHeight,
         width: treeWidth,
-        'align-tips': alignTips,
-        'selectable': false,
-        'show-scale': showScale,
-        'is-radial': false,
         'left-right-spacing': 'fit-to-size',
         'top-bottom-spacing': 'fit-to-size',
-        'node_circle_size': () => 0,
-        'internal-names': showInternal
+        'show-scale': showScale,
+        'is-radial': false,
+        'show-menu': false,
+        selectable: false,
+        collapsible: false,
+        reroot: false,
+        hide: false,
+        'edge-styler': edgeStyler
       });
 
-      if (!renderedTree) {
-        treeContainer.innerHTML = '<p>Failed to render tree</p>';
-        return;
-      }
-
-      // Apply branch coloring based on selected option
-      if (colorBranches === 'Tested') {
-        const tested = data.tested || {};
-        renderedTree.style_edges((element, node) => {
-          const branchName = node.target?.data?.name;
-          if (branchName && tested[branchName] === 'test') {
-            element.style('stroke', 'firebrick').style('stroke-width', '3px');
-          } else {
-            element.style('stroke', null).style('stroke-width', null);
-          }
-        });
-      }
+      // Clear the container and append the SVG element
+      treeContainer.innerHTML = '';
+      treeContainer.appendChild(renderedTree.show());
 
       // Style nodes to use monospace font
       if (renderedTree && typeof renderedTree.style_nodes === 'function') {
@@ -832,13 +836,17 @@
         });
       }
 
-      // Add to container
-      if (renderedTree?.display && typeof renderedTree.display === 'function') {
-        const treeElement = renderedTree.display();
-        if (treeElement) {
-          treeContainer.appendChild(treeElement.node());
-        }
+      // Apply branch coloring after rendering
+      if (colorBranches === 'Tested' && renderedTree && typeof renderedTree.style_edges === 'function') {
+        const tested = data.tested || {};
+        renderedTree.style_edges((element, node) => {
+          const branchName = node.target?.data?.name;
+          if (branchName && tested[branchName] === 'test') {
+            element.style('stroke', 'firebrick').style('stroke-width', '3px');
+          }
+        });
       }
+
     } catch (error) {
       console.error('Error rendering BUSTED tree:', error);
       if (treeContainer) {
