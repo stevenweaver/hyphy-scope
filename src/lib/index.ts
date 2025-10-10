@@ -10,6 +10,7 @@ export { default as SlacVisualization } from './SlacVisualization.svelte';
 export { default as BgmVisualization } from './BgmVisualization.svelte';
 export { default as FadeVisualization } from './FadeVisualization.svelte';
 export { default as GardVisualization } from './GardVisualization.svelte';
+export { default as FubarVisualization } from './FubarVisualization.svelte';
 export { default as PhylogeneticTreeViewer } from './PhylogeneticTreeViewer.svelte';
 
 // Export utilities
@@ -18,6 +19,7 @@ export * from './utils/meme-utils.js';
 export * from './utils/meme-plots.js';
 export * from './utils/absrel-utils.js';
 export * from './utils/absrel-plots.js';
+export * from './utils/fubar-utils.js';
 
 // Data utilities
 export { loadDataFromUrl, loadDataFromStorage, getTestData } from './data/data-loader.js';

@@ -1,16 +1,18 @@
 <script>
 	import { onMount } from 'svelte';
-	import { HelloWorld, FelVisualization, MemeVisualization, AbsrelVisualization } from '$lib';
+	import { HelloWorld, FelVisualization, MemeVisualization, AbsrelVisualization, FubarVisualization } from '$lib';
 	import { getTestData } from '$lib/data/data-loader';
 
 	let memeTestData = null;
 	let felTestData = null;
 	let absrelTestData = null;
+	let fubarTestData = null;
 
 	onMount(async () => {
 		memeTestData = await getTestData('meme');
 		felTestData = await getTestData('fel');
 		absrelTestData = await getTestData('absrel');
+		fubarTestData = await getTestData('fubar');
 	});
 	
 	// Demo data for FEL component
@@ -175,6 +177,39 @@
 			<p><a href="/absrel">→ View full aBSREL demo</a></p>
 		</div>
 
+		<div class="component-item">
+			<h2>FubarVisualization</h2>
+			<p>Interactive visualization for Fast Unconstrained Bayesian AppRoximation (FUBAR) analysis results from HyPhy.</p>
+
+			<div class="demo-area">
+				<div class="fubar-preview">
+					{#if fubarTestData}
+						<FubarVisualization data={fubarTestData} />
+					{:else}
+						<p>Loading FUBAR demo...</p>
+					{/if}
+				</div>
+			</div>
+
+			<details>
+				<summary>Code Example</summary>
+				<pre><code>{@html `&lt;script&gt;
+	import { FubarVisualization } from 'hyphy-scope';
+	import { onMount } from 'svelte';
+
+	let data = null;
+
+	onMount(async () => {
+		data = await loadFubarData();
+	});
+&lt;/script&gt;
+
+&lt;FubarVisualization {data} /&gt;`}</code></pre>
+			</details>
+
+			<p><a href="/fubar">→ View full FUBAR demo</a></p>
+		</div>
+
 		<div class="placeholder">
 			<h2>More Components Coming Soon</h2>
 			<p>This is where we'll showcase:</p>
@@ -247,7 +282,7 @@
 		margin-top: 0.5rem;
 	}
 
-	.fel-preview, .meme-preview, .absrel-preview {
+	.fel-preview, .meme-preview, .absrel-preview, .fubar-preview {
 		max-height: 400px;
 		overflow-y: auto;
 		border: 1px solid #ddd;
