@@ -1,18 +1,20 @@
 <script>
 	import { onMount } from 'svelte';
-	import { HelloWorld, FelVisualization, MemeVisualization, AbsrelVisualization, FubarVisualization } from '$lib';
+	import { HelloWorld, FelVisualization, MemeVisualization, AbsrelVisualization, FubarVisualization, MultiHitVisualization } from '$lib';
 	import { getTestData } from '$lib/data/data-loader';
 
 	let memeTestData = null;
 	let felTestData = null;
 	let absrelTestData = null;
 	let fubarTestData = null;
+	let multihitTestData = null;
 
 	onMount(async () => {
 		memeTestData = await getTestData('meme');
 		felTestData = await getTestData('fel');
 		absrelTestData = await getTestData('absrel');
 		fubarTestData = await getTestData('fubar');
+		multihitTestData = await getTestData('multihit');
 	});
 	
 	// Demo data for FEL component
@@ -210,6 +212,39 @@
 			<p><a href="/fubar">→ View full FUBAR demo</a></p>
 		</div>
 
+		<div class="component-item">
+			<h2>MultiHitVisualization</h2>
+			<p>Interactive visualization for Multi-Hit analysis results - detecting instantaneous multiple-nucleotide changes.</p>
+
+			<div class="demo-area">
+				<div class="multihit-preview">
+					{#if multihitTestData}
+						<MultiHitVisualization data={multihitTestData} />
+					{:else}
+						<p>Loading Multi-Hit demo...</p>
+					{/if}
+				</div>
+			</div>
+
+			<details>
+				<summary>Code Example</summary>
+				<pre><code>{@html `&lt;script&gt;
+	import { MultiHitVisualization } from 'hyphy-scope';
+	import { onMount } from 'svelte';
+
+	let data = null;
+
+	onMount(async () => {
+		data = await loadMultiHitData();
+	});
+&lt;/script&gt;
+
+&lt;MultiHitVisualization {data} /&gt;`}</code></pre>
+			</details>
+
+			<p><a href="/multihit">→ View full Multi-Hit demo</a></p>
+		</div>
+
 		<div class="placeholder">
 			<h2>More Components Coming Soon</h2>
 			<p>This is where we'll showcase:</p>
@@ -282,7 +317,7 @@
 		margin-top: 0.5rem;
 	}
 
-	.fel-preview, .meme-preview, .absrel-preview, .fubar-preview {
+	.fel-preview, .meme-preview, .absrel-preview, .fubar-preview, .multihit-preview {
 		max-height: 400px;
 		overflow-y: auto;
 		border: 1px solid #ddd;

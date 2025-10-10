@@ -70,6 +70,10 @@
 				<h3>GARD</h3>
 				<p>Genetic Algorithm for Recombination Detection</p>
 			</a>
+			<a href="/multihit" class="component-card">
+				<h3>Multi-Hit</h3>
+				<p>Instantaneous Multiple-Nucleotide Changes</p>
+			</a>
 		</div>
 		<p style="text-align: center; margin-top: 1rem;">
 			<a href="/components">→ View all components with examples</a>

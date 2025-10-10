@@ -1,5 +1,5 @@
 // Define available analysis types
-export type AnalysisType = 'fel' | 'meme' | 'slac' | 'busted' | 'absrel' | 'relax' | 'bgm' | 'fade' | 'gard' | 'fubar';
+export type AnalysisType = 'fel' | 'meme' | 'slac' | 'busted' | 'absrel' | 'relax' | 'bgm' | 'fade' | 'gard' | 'fubar' | 'multihit';
 
 // Data loading function that fetches JSON files as static assets
 export async function getTestData(analysis: AnalysisType): Promise<any> {
