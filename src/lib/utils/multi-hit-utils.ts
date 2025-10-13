@@ -146,8 +146,20 @@ export function formatSiteLogLikelihood(data: MultiHitResults): number[][] {
 /**
  * Get ER range (min, max) for a dataset
  */
+/**
+ * Format number to 3 significant figures
+ */
+function formatSigFigs(num: number, sigFigs: number = 3): number {
+  if (num === 0) return 0;
+  const magnitude = Math.floor(Math.log10(Math.abs(num)));
+  const scale = Math.pow(10, sigFigs - magnitude - 1);
+  return Math.round(num * scale) / scale;
+}
+
 export function getERRange(values: number[]): [number, number] {
-  return [Math.min(...values), Math.max(...values)];
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  return [formatSigFigs(min, 3), formatSigFigs(max, 3)];
 }
 
 /**
