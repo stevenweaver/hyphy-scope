@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount, afterUpdate } from 'svelte';
   import * as d3 from 'd3';
-  import CircosJS from 'circos';
+  import * as Plot from '@observablehq/plot';
   import type { MultiHitResults, ERThresholds } from './utils/multi-hit-utils.js';
   import {
     formatEvidenceRatios,
@@ -21,17 +21,21 @@
   let pThreshold = 0.1;
   let erThresholds: ERThresholds = {};
   let minimumTransitions = 3;
-  let showLabels = true;
+  let showLabels = false;
   let showLegend = true;
 
   // Circos data
   let circosLayout: any[] = [];
   let circosChordData: any[] = [];
   let maxTransitionCount = 0;
+  let CircosJS: any = null;
 
   // Container refs
   let circosContainer: HTMLDivElement;
   let legendContainer: SVGSVGElement;
+  let benchmarksContainer: HTMLDivElement;
+  let erPlotContainer: HTMLDivElement;
+  let logLPlotContainer: HTMLDivElement;
 
   // Reactive data
   $: erTableData = data ? formatEvidenceRatios(data) : [];
@@ -113,7 +117,7 @@
   }
 
   function renderCircos() {
-    if (!circosContainer || circosLayout.length === 0) return;
+    if (!circosContainer || circosLayout.length === 0 || !CircosJS) return;
 
     // Clear previous rendering
     circosContainer.innerHTML = '';
@@ -148,15 +152,116 @@
       color: (d: any) => getCodonColor(d.source.codon),
       opacity: 0.2,
       tooltipContent: (d: any) => {
+        // Log the data structure to debug
+        console.log('Chord data:', d);
+
         const sourceAA = translationTable[d.source.codon] || '?';
         const targetAA = translationTable[d.target.codon] || '?';
-        return `<div style="padding: 8px; background: white; border: 1px solid #ddd;">
-          <strong>${d.source.codon}</strong> (${sourceAA}) → <strong>${d.target.codon}</strong> (${targetAA}): ${d.count}
+        const sourceCodon = d.source.codon || d.source.id?.replace('codon-', '') || '???';
+        const targetCodon = d.target.codon || d.target.id?.replace('codon-', '') || '???';
+        const count = d.value || d.count || 0;
+
+        return `<div style="padding: 8px; background: white; border: 1px solid #ddd; border-radius: 4px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+          <div style="margin-bottom: 4px;"><strong>Substitution:</strong></div>
+          <div style="font-family: monospace;">${sourceCodon} (${sourceAA}) → ${targetCodon} (${targetAA})</div>
+          <div style="margin-top: 4px;"><strong>Count:</strong> ${count}</div>
         </div>`;
       }
     });
 
     circos.render();
+
+    // Manually add tooltips using D3 after render
+    setTimeout(() => {
+      const svg = d3.select(circosContainer).select('svg');
+
+      // Create tooltip div if it doesn't exist
+      let tooltip = d3.select('body').select('.circos-tooltip');
+      if (tooltip.empty()) {
+        tooltip = d3.select('body')
+          .append('div')
+          .attr('class', 'circos-tooltip')
+          .style('position', 'fixed')
+          .style('padding', '8px')
+          .style('background', 'white')
+          .style('border', '1px solid #ddd')
+          .style('border-radius', '4px')
+          .style('box-shadow', '0 2px 4px rgba(0,0,0,0.1)')
+          .style('pointer-events', 'none')
+          .style('opacity', 0)
+          .style('z-index', 10000)
+          .style('font-size', '14px');
+      }
+
+      // Try multiple selectors to find chord elements
+      const selectors = [
+        'path[class*="chord"]',
+        'path.chord',
+        '.chord path',
+        'g[data-name="flow"] path',
+        'g.chords path',
+        'path'
+      ];
+
+      let chordElements: any = null;
+      for (const selector of selectors) {
+        const elements = svg.selectAll(selector);
+        if (!elements.empty()) {
+          console.log('Found elements with selector:', selector, 'count:', elements.size());
+          chordElements = elements;
+          break;
+        }
+      }
+
+      if (chordElements && !chordElements.empty()) {
+        // Store chord data on elements by matching paths
+        chordElements.each(function(d: any, i: number) {
+          const element = d3.select(this as any);
+          const chordData = circosChordData[i];
+
+          if (chordData) {
+            // Store data as attribute
+            element.attr('data-source-codon', chordData.source.codon);
+            element.attr('data-target-codon', chordData.target.codon);
+            element.attr('data-count', chordData.count);
+          }
+        });
+
+        // Add event handlers
+        chordElements
+          .on('mouseover', function(event: any) {
+            const element = d3.select(this as any);
+            const sourceCodon = element.attr('data-source-codon');
+            const targetCodon = element.attr('data-target-codon');
+            const count = element.attr('data-count');
+
+            if (sourceCodon && targetCodon) {
+              const sourceAA = translationTable[sourceCodon] || '?';
+              const targetAA = translationTable[targetCodon] || '?';
+
+              tooltip
+                .style('opacity', 1)
+                .html(`
+                  <div><strong>Substitution:</strong></div>
+                  <div style="font-family: monospace;">${sourceCodon} (${sourceAA}) → ${targetCodon} (${targetAA})</div>
+                  <div style="margin-top: 4px;"><strong>Count:</strong> ${count}</div>
+                `)
+                .style('left', (event.clientX + 10) + 'px')
+                .style('top', (event.clientY - 10) + 'px');
+            }
+          })
+          .on('mousemove', function(event: any) {
+            tooltip
+              .style('left', (event.clientX + 10) + 'px')
+              .style('top', (event.clientY - 10) + 'px');
+          })
+          .on('mouseout', function() {
+            tooltip.style('opacity', 0);
+          });
+      } else {
+        console.warn('Could not find chord elements in SVG');
+      }
+    }, 500);
   }
 
   function buildLegend() {
@@ -194,7 +299,148 @@
       .attr('alignment-baseline', 'middle');
   }
 
-  onMount(() => {
+  function renderBenchmarksPlot() {
+    if (!benchmarksContainer || !data?.fits) return;
+
+    benchmarksContainer.innerHTML = '';
+
+    // Prepare data for benchmarks plot
+    const benchmarksData = Object.entries(data.fits).map(([model, fit]: [string, any]) => ({
+      model,
+      time: fit['running time'] || 0
+    }));
+
+    const plot = Plot.plot({
+      width: benchmarksContainer.clientWidth || 1000,
+      marginLeft: 180,
+      height: 300,
+      x: {
+        label: 'Time (seconds)',
+        grid: true
+      },
+      y: {
+        label: 'Model'
+      },
+      marks: [
+        Plot.barX(benchmarksData, {
+          x: 'time',
+          y: 'model',
+          fill: 'steelblue',
+          tip: true
+        }),
+        Plot.ruleX([0])
+      ]
+    });
+
+    benchmarksContainer.appendChild(plot);
+  }
+
+  function renderERPlot() {
+    if (!erPlotContainer || !data?.['Evidence Ratios']) return;
+
+    erPlotContainer.innerHTML = '';
+
+    // Prepare data for ER plots - convert to long format
+    const erData: any[] = [];
+    Object.entries(data['Evidence Ratios']).forEach(([model, values]) => {
+      values.forEach((row: number[]) => {
+        const site = row[0];
+        const er = row[1];
+        if (site !== undefined && er !== undefined) {
+          erData.push({ model, site, er });
+        }
+      });
+    });
+
+    const plot = Plot.plot({
+      width: erPlotContainer.clientWidth || 1000,
+      height: 400,
+      marginLeft: 60,
+      marginRight: 10,
+      x: {
+        label: 'Site',
+        grid: false
+      },
+      y: {
+        label: 'Evidence Ratio',
+        grid: false
+      },
+      facet: {
+        data: erData,
+        y: 'model',
+        marginRight: 80
+      },
+      marks: [
+        Plot.frame(),
+        Plot.ruleY([0], { stroke: '#ccc' }),
+        Plot.ruleY(erData, {
+          x: 'site',
+          y: 'er',
+          stroke: 'steelblue',
+          strokeWidth: 1,
+          tip: true
+        })
+      ]
+    });
+
+    erPlotContainer.appendChild(plot);
+  }
+
+  function renderLogLPlot() {
+    if (!logLPlotContainer || !data?.['Site Log Likelihood']) return;
+
+    logLPlotContainer.innerHTML = '';
+
+    // Prepare data for log-likelihood plots
+    const logLData: any[] = [];
+    Object.entries(data['Site Log Likelihood']).forEach(([model, values]) => {
+      values.forEach((row: number[]) => {
+        const site = row[0];
+        const logL = row[1];
+        if (site !== undefined && logL !== undefined) {
+          logLData.push({ model, site, site_log_likelihood: logL });
+        }
+      });
+    });
+
+    const plot = Plot.plot({
+      width: logLPlotContainer.clientWidth || 1000,
+      height: 400,
+      marginLeft: 60,
+      marginRight: 10,
+      x: {
+        label: 'Site',
+        grid: false
+      },
+      y: {
+        label: 'Site Log-Likelihood',
+        grid: false
+      },
+      facet: {
+        data: logLData,
+        y: 'model',
+        marginRight: 80
+      },
+      marks: [
+        Plot.frame(),
+        Plot.dot(logLData, {
+          x: 'site',
+          y: 'site_log_likelihood',
+          fill: 'steelblue',
+          r: 2,
+          tip: true
+        })
+      ]
+    });
+
+    logLPlotContainer.appendChild(plot);
+  }
+
+  onMount(async () => {
+    // Dynamically import CircosJS to avoid SSR issues
+    const circosModule = await import('circos');
+    CircosJS = circosModule.default;
+
     if (data) {
       erThresholds = initializeERThresholds(data);
       updateCircosData();
@@ -206,6 +452,9 @@
     if (showLegend) {
       buildLegend();
     }
+    renderBenchmarksPlot();
+    renderERPlot();
+    renderLogLPlot();
   });
 
   // Update circos when thresholds or transitions change
@@ -626,8 +875,23 @@
     </div>
   </section>
 
+  <section id="benchmarks-section">
+    <h2>Figure 3. Model Fitting Benchmarks</h2>
+    <div bind:this={benchmarksContainer}></div>
+  </section>
+
+  <section id="er-plot-section">
+    <h2>Evidence Ratio by Site</h2>
+    <div bind:this={erPlotContainer}></div>
+  </section>
+
+  <section id="logl-plot-section">
+    <h2>Site Log-Likelihood by Site</h2>
+    <div bind:this={logLPlotContainer}></div>
+  </section>
+
   <section id="table-tab">
-    <h2>Model Test Statistics Per Site</h2>
+    <h2>Model Test Statistics Per Site Table</h2>
 
     <div class="table-selector">
       <button
@@ -711,23 +975,25 @@
         <h3>Evidence Ratio Thresholds</h3>
         <div class="er-threshold-grid">
           {#each Object.keys(data['Evidence Ratios']) as erKey}
-            <div class="er-control">
-              <div class="er-control-header">{erKey}</div>
-              <div class="er-inputs">
-                <input
-                  type="number"
-                  placeholder="Min"
-                  bind:value={erThresholds[erKey][0]}
-                  step="0.1"
-                />
-                <input
-                  type="number"
-                  placeholder="Max"
-                  bind:value={erThresholds[erKey][1]}
-                  step="0.1"
-                />
+            {#if erThresholds[erKey]}
+              <div class="er-control">
+                <div class="er-control-header">{erKey}</div>
+                <div class="er-inputs">
+                  <input
+                    type="number"
+                    placeholder="Min"
+                    bind:value={erThresholds[erKey][0]}
+                    step="0.1"
+                  />
+                  <input
+                    type="number"
+                    placeholder="Max"
+                    bind:value={erThresholds[erKey][1]}
+                    step="0.1"
+                  />
+                </div>
               </div>
-            </div>
+            {/if}
           {/each}
         </div>
 
