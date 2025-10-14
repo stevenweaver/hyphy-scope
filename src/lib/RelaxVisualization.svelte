@@ -255,10 +255,11 @@
       .attr('x2', omegaScale(1))
       .attr('y1', 0)
       .attr('y2', plotHeight)
-      .style('stroke', '#999')
-      .style('stroke-dasharray', '5,5');
+      .style('stroke', '#cbd5e1')
+      .style('stroke-dasharray', '5,5')
+      .style('stroke-width', 2);
 
-    // Reference lines (black)
+    // Reference lines (slate gray)
     if (testData) {
       plot.selectAll('.hyphy-omega-line-reference')
         .data(referenceData)
@@ -269,11 +270,11 @@
         .attr('x2', d => omegaScale(d.omega))
         .attr('y1', proportionScale(-0.05))
         .attr('y2', d => proportionScale(d.proportion))
-        .style('stroke', '#000')
+        .style('stroke', '#64748b')
         .style('stroke-width', 3);
     }
 
-    // Test lines (teal)
+    // Test lines (modern blue)
     const linesToPlot = testData || referenceData;
     plot.selectAll('.hyphy-omega-line')
       .data(linesToPlot)
@@ -284,7 +285,7 @@
       .attr('x2', d => omegaScale(d.omega))
       .attr('y1', proportionScale(-0.05))
       .attr('y2', d => proportionScale(d.proportion))
-      .style('stroke', '#00a99d')
+      .style('stroke', '#3b82f6')
       .style('stroke-width', 3);
 
     // Displacement springs
@@ -304,8 +305,8 @@
         .attr('markerWidth', 10)
         .attr('markerHeight', 8)
         .attr('orient', 'auto')
-        .attr('stroke', '#000')
-        .attr('fill', '#000')
+        .attr('stroke', '#1e293b')
+        .attr('fill', '#1e293b')
         .append('path')
         .attr('d', 'M 0,0 V8 L10,4 Z');
 
@@ -323,7 +324,7 @@
           5
         ))
         .attr('marker-end', `url(#arrowhead-${modelName.replace(/\s+/g, '-')})`)
-        .style('stroke', '#000')
+        .style('stroke', '#1e293b')
         .style('fill', 'none')
         .style('stroke-width', 1.5);
     }
@@ -361,8 +362,8 @@
         .attr('transform', `translate(${dimensions.width}, 40)`);
 
       const legendData = [
-        { label: testGroup, color: '#00a99d' },
-        { label: refGroup, color: '#000' }
+        { label: testGroup, color: '#3b82f6' },
+        { label: refGroup, color: '#64748b' }
       ];
 
       legendData.forEach((item, i) => {
@@ -391,7 +392,7 @@
     const descModel = modelFits.find(m => m.model === 'RELAX partitioned descriptive');
 
     if (nullModelContainer && nullModel) {
-      renderOmegaPlot(nullModelContainer, 'RELAX null', nullModel, referenceGroup, referenceGroup);
+      renderOmegaPlot(nullModelContainer, 'RELAX null', nullModel, referenceGroup, groupInView);
     }
 
     if (altModelContainer && altModel) {
@@ -601,7 +602,7 @@
 
   .summary-section {
     background: #f8f9fa;
-    border-left: 4px solid #00a99d;
+    border-left: 4px solid #3b82f6;
   }
 
   .summary-text {
@@ -612,7 +613,7 @@
   .summary-direction,
   .summary-k,
   .summary-lrt {
-    color: #00a99d;
+    color: #3b82f6;
   }
 
   .summary-evidence {
@@ -746,23 +747,23 @@
 
   /* Global styles for D3 elements */
   :global(.hyphy-neutral-line) {
-    stroke: #999;
+    stroke: #cbd5e1;
     stroke-width: 2;
     stroke-dasharray: 5,5;
   }
 
   :global(.hyphy-omega-line) {
-    stroke: #00a99d;
+    stroke: #3b82f6;
     stroke-width: 3;
   }
 
   :global(.hyphy-omega-line-reference) {
-    stroke: #000;
+    stroke: #64748b;
     stroke-width: 3;
   }
 
   :global(.hyphy-displacement-line) {
-    stroke: #000;
+    stroke: #1e293b;
     stroke-width: 1.5;
     fill: none;
   }
