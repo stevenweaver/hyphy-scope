@@ -11,6 +11,7 @@
 	export let showScale = true;
 	export let isRadial = false;
 	export let treeIndex = 0;
+	export let testedBranches = null; // Object mapping branch names to "test" or "background"
 
 	let treeContainer;
 	let tree;
@@ -37,13 +38,16 @@
 		(colorBranches === "branch length" || colorBranches === "bootstrap")
 	);
 
+	// Separate legend for tested branches (uses categorical colors, not a gradient)
+	$: testedLegendVisible = colorBranches === "tested" && testedBranches;
+
 	onMount(() => {
 		renderTree();
 	});
 
 	afterUpdate(() => {
 		const newick = getTreeNewick(data, treeIndex);
-		const currentDataKey = `${JSON.stringify(data)}-${treeIndex}-${colorBranches}-${branchLengthProperty}-${width}-${height}-${isRadial}-${showScale}`;
+		const currentDataKey = `${JSON.stringify(data)}-${treeIndex}-${colorBranches}-${branchLengthProperty}-${width}-${height}-${isRadial}-${showScale}-${JSON.stringify(testedBranches)}`;
 
 		if (
 			newick &&
@@ -237,6 +241,37 @@
 		};
 	}
 
+	// Colors for tested/background branches
+	const TESTED_COLORS = {
+		test: "#e74c3c",      // Red for tested branches
+		background: "#95a5a6" // Gray for background branches
+	};
+
+	// Tested branches colorizer function
+	function createTestedColorizer(testedBranches) {
+		return function (element, data) {
+			try {
+				if (colorBranches !== "tested" || !testedBranches) {
+					return;
+				}
+
+				// Get target node name
+				const targetName = data.target?.data?.name || data.target?.name;
+				if (!targetName) {
+					return;
+				}
+
+				const testedStatus = testedBranches[targetName];
+				if (testedStatus && TESTED_COLORS[testedStatus]) {
+					element.style("stroke", TESTED_COLORS[testedStatus]);
+					element.style("stroke-width", testedStatus === "test" ? "3px" : "1.5px");
+				}
+			} catch (e) {
+				console.error("Error in testedColorizer:", e);
+			}
+		};
+	}
+
 	// Bootstrap colorizer function for coloring by internal node bootstrap values
 	function createBootstrapColorizer(colorScale) {
 		return function (element, data) {
@@ -297,7 +332,7 @@
 		}
 
 		isRendering = true;
-		const currentDataKey = `${JSON.stringify(data)}-${treeIndex}-${colorBranches}-${branchLengthProperty}-${width}-${height}-${isRadial}-${showScale}`;
+		const currentDataKey = `${JSON.stringify(data)}-${treeIndex}-${colorBranches}-${branchLengthProperty}-${width}-${height}-${isRadial}-${showScale}-${JSON.stringify(testedBranches)}`;
 
 		try {
 			// Make sure we have a valid Newick string
@@ -367,6 +402,8 @@
 				.domain([0, 100]); // Bootstrap values are typically 0-100
 			localColorRange = [0, 100]; // Default range
 			branchColorizer = createBootstrapColorizer(localColorScale);
+		} else if (colorBranches === "tested" && testedBranches) {
+			branchColorizer = createTestedColorizer(testedBranches);
 		}
 
 		// Combined edge styler function
@@ -462,6 +499,9 @@
 				<label for="color-branches">Color branches:</label>
 				<select id="color-branches" bind:value={colorBranches}>
 					<option value="none">None</option>
+					{#if testedBranches}
+						<option value="tested">Tested branches</option>
+					{/if}
 					<option value="branch length">Branch length</option>
 					<option value="bootstrap">Bootstrap values</option>
 				</select>
@@ -506,6 +546,22 @@
 								colorBranches === "bootstrap" ? 0 : 2,
 							)}</span
 						>
+					</div>
+				</div>
+			</div>
+		{/if}
+
+		{#if testedLegendVisible}
+			<div class="color-legend tested-legend">
+				<span class="legend-title">Tested branches:</span>
+				<div class="tested-legend-items">
+					<div class="tested-legend-item">
+						<span class="tested-color-box" style="background-color: #e74c3c;"></span>
+						<span>Test</span>
+					</div>
+					<div class="tested-legend-item">
+						<span class="tested-color-box" style="background-color: #95a5a6;"></span>
+						<span>Background</span>
 					</div>
 				</div>
 			</div>
@@ -651,6 +707,24 @@
 		font-size: 0.7rem;
 		color: #666;
 		line-height: 1;
+	}
+
+	.tested-legend-items {
+		display: flex;
+		gap: 1rem;
+	}
+
+	.tested-legend-item {
+		display: flex;
+		align-items: center;
+		gap: 0.4rem;
+	}
+
+	.tested-color-box {
+		width: 20px;
+		height: 12px;
+		border-radius: 2px;
+		border: 1px solid #ccc;
 	}
 
 	.error {

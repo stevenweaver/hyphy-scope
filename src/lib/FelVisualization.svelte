@@ -209,10 +209,12 @@
   // Tree visualization settings
   let treeWidth = 800;
   let treeHeight = 500;
+  let treeColorBranches = "none"; // Will be set to "tested" if tested data is available
 
   // Core state
   let attributes: any = {};
   let sitesTable: [SiteData[], any[], any] = [[], [], {}];
+  let testedBranches: Record<string, string> | null = null;
   let tileSpecs: any[] = [];
   let plotDescription: string = "";
   let availablePlotTypes: string[] = [];
@@ -278,25 +280,44 @@
     attributes = getFelAttributes(data);
     sitesTable = getFelSiteTableData(data, pvalueThreshold);
     tileSpecs = getFelTileSpecs(data, pvalueThreshold);
-    
+
     const plotOptions = getFelPlotOptions(attributes.hasPasmt);
     availablePlotTypes = plotOptions
       .filter(option => option.available(data))
       .map(option => option.label);
-    
+
     if (!availablePlotTypes.includes(plotType) && availablePlotTypes.length > 0) {
       plotType = availablePlotTypes[0];
     }
-    
+
+    // Extract tested branches if available
+    if (data.tested) {
+      // Get the first partition's tested branches (or merge all if needed)
+      const testedData = data.tested;
+      if (typeof testedData === 'object') {
+        // If it's organized by partition (e.g., {"0": {...}}), get the first partition
+        const keys = Object.keys(testedData);
+        if (keys.length > 0 && typeof testedData[keys[0]] === 'object') {
+          testedBranches = testedData[keys[0]];
+        } else {
+          testedBranches = testedData;
+        }
+        // Set default color mode to "tested" if we have tested branch data
+        treeColorBranches = "tested";
+      }
+    } else {
+      testedBranches = null;
+    }
+
     // Update computed data
     updateComputedData();
-    
+
     // Mark data as processed
     dataProcessed = true;
-    
+
     // Force UI update
     await tick();
-    
+
     // Update plot if container is ready
     if (plotContainer) {
       updatePlot();
@@ -484,14 +505,16 @@
         </div>
       </div>
 
-      <PhylogeneticTreeViewer 
-        {data} 
-        width={treeWidth} 
+      <PhylogeneticTreeViewer
+        {data}
+        width={treeWidth}
         height={treeHeight}
         branchLengthProperty="branch length"
         showScale={true}
         isRadial={false}
         treeIndex={0}
+        {testedBranches}
+        colorBranches={treeColorBranches}
       />
     </div>
 
