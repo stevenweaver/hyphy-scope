@@ -347,8 +347,11 @@
       // Clear previous tree
       treeContainer.innerHTML = '';
       
-      // Get the Newick string
-      const newick = data.input.trees;
+      // Get the Newick string - extract from object if needed
+      const trees = data.input.trees;
+      const newick = typeof trees === 'string'
+        ? trees
+        : trees[Object.keys(trees)[0]];
       if (!newick) return;
       
       // Create phylotree instance
