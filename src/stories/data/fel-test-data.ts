@@ -97,5 +97,29 @@ export const felTestData = {
     "tested": 10,
     "positive test results": 4,
     "negative test results": 6
+  },
+  "tested": {
+    "0": {
+      "Cow": "test",
+      "Raccoon": "test",
+      "Bear": "test",
+      "Monkey": "test",
+      "Cat": "background",
+      "Weasel": "background",
+      "Dog": "background",
+      "Seal": "background",
+      "Horse": "background",
+      "Node1": "test",
+      "Node2": "background",
+      "Node3": "test",
+      "Node4": "background",
+      "Node5": "test"
+    }
   }
+};
+
+// FEL test data without tested branches (for comparison)
+export const felTestDataNoTestedBranches = {
+  ...felTestData,
+  tested: undefined
 };

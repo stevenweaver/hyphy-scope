@@ -58,7 +58,28 @@ export const phylotreeTestData = {
         "dN/dS": 1.2
       }
     }
+  },
+  "tested": {
+    "0": {
+      "raccoon": "test",
+      "bear": "test",
+      "sea_lion": "background",
+      "seal": "background",
+      "monkey": "test",
+      "cat": "test",
+      "weasel": "background",
+      "dog": "test",
+      "Node1": "test",
+      "Node2": "background",
+      "Node3": "test"
+    }
   }
+};
+
+// Tree data without tested branches
+export const phylotreeTestDataNoTested = {
+  ...phylotreeTestData,
+  tested: undefined
 };
 
 // Additional test data with a larger tree

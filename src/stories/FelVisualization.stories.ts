@@ -2,7 +2,7 @@ import type { Meta, StoryObj } from '@storybook/svelte';
 import FelVisualization from '$lib/FelVisualization.svelte';
 
 // Import test data from TypeScript file
-import { felTestData } from './data/fel-test-data';
+import { felTestData, felTestDataNoTestedBranches } from './data/fel-test-data';
 
 const meta = {
   title: 'Visualizations/FEL Visualization',
@@ -112,6 +112,40 @@ export const TreeVisualizationFocus: Story = {
     docs: {
       description: {
         story: 'FEL analysis with focus on the phylogenetic tree visualization. Use the width (400-2400px) and height (300-1600px) sliders above the tree to adjust dimensions for better viewing of different tree sizes.'
+      }
+    }
+  }
+};
+
+// Story showing tested branches colored on the tree (new feature)
+export const TestedBranchesHighlighted: Story = {
+  args: {
+    data: felTestData,
+    pvalueThreshold: 0.1,
+    showColumns: ['Diversifying', 'Purifying', 'Neutral', 'Invariable'],
+    plotType: 'alpha/beta site-level estimates'
+  },
+  parameters: {
+    docs: {
+      description: {
+        story: 'FEL analysis with tested branches highlighted on the phylogenetic tree. Tested branches are shown in red, background branches in gray. This is the default view when tested branch data is available.'
+      }
+    }
+  }
+};
+
+// Story without tested branches data (for comparison)
+export const WithoutTestedBranches: Story = {
+  args: {
+    data: felTestDataNoTestedBranches,
+    pvalueThreshold: 0.1,
+    showColumns: ['Diversifying', 'Purifying', 'Neutral', 'Invariable'],
+    plotType: 'alpha/beta site-level estimates'
+  },
+  parameters: {
+    docs: {
+      description: {
+        story: 'FEL analysis without tested branch information. The tree uses default coloring options (none, branch length, or bootstrap).'
       }
     }
   }

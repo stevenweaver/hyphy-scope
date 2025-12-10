@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/svelte';
 import PhylogeneticTreeViewer from '$lib/PhylogeneticTreeViewer.svelte';
-import { phylotreeTestData, largePhylotreeTestData } from './data/phylotree-test-data';
+import { phylotreeTestData, largePhylotreeTestData, phylotreeTestDataNoTested } from './data/phylotree-test-data';
 
 const meta = {
   title: 'Visualizations/Phylogenetic Tree Viewer',
@@ -25,8 +25,12 @@ const meta = {
     },
     colorBranches: {
       control: 'select',
-      options: ['none', 'branch length', 'bootstrap'],
+      options: ['none', 'tested', 'branch length', 'bootstrap'],
       description: 'How to color tree branches'
+    },
+    testedBranches: {
+      control: 'object',
+      description: 'Object mapping branch names to "test" or "background" status'
     },
     showLabels: {
       control: 'boolean',
@@ -147,5 +151,46 @@ export const NoData: Story = {
     data: null,
     width: 800,
     height: 600
+  }
+};
+
+// Tree with tested branches coloring (new feature)
+export const TestedBranchesColoring: Story = {
+  args: {
+    data: phylotreeTestData,
+    width: 800,
+    height: 600,
+    branchLengthProperty: 'branch length',
+    colorBranches: 'tested',
+    testedBranches: phylotreeTestData.tested?.["0"],
+    showLabels: true,
+    treeIndex: 0
+  },
+  parameters: {
+    docs: {
+      description: {
+        story: 'Tree with tested branches highlighted. Tested branches are shown in red, background branches in gray. This coloring mode is automatically selected when tested branch data is available in HyPhy analysis results.'
+      }
+    }
+  }
+};
+
+// Tree without tested branch data
+export const WithoutTestedBranches: Story = {
+  args: {
+    data: phylotreeTestDataNoTested,
+    width: 800,
+    height: 600,
+    branchLengthProperty: 'branch length',
+    colorBranches: 'none',
+    showLabels: true,
+    treeIndex: 0
+  },
+  parameters: {
+    docs: {
+      description: {
+        story: 'Tree without tested branch information. The "Tested branches" coloring option will not appear in the dropdown when no tested data is provided.'
+      }
+    }
   }
 };

@@ -93,5 +93,27 @@ export const memeTestData = {
     "tested": 10,
     "positive test results": 4,
     "negative test results": 6
+  },
+  "tested": {
+    "0": {
+      "Cow": "test",
+      "Raccoon": "background",
+      "Bear": "test",
+      "Monkey": "background",
+      "Cat": "test",
+      "Weasel": "test",
+      "Dog": "background",
+      "Seal": "test",
+      "Horse": "background",
+      "Node1": "test",
+      "Node2": "background",
+      "Node3": "test"
+    }
   }
+};
+
+// MEME test data without tested branches (for comparison)
+export const memeTestDataNoTestedBranches = {
+  ...memeTestData,
+  tested: undefined
 };

@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/svelte';
 import MemeVisualization from '$lib/MemeVisualization.svelte';
-import { memeTestData } from './data/meme-test-data';
+import { memeTestData, memeTestDataNoTestedBranches } from './data/meme-test-data';
 
 const meta = {
   title: 'Visualizations/MEME Visualization',
@@ -103,6 +103,40 @@ export const TreeVisualizationFocus: Story = {
     docs: {
       description: {
         story: 'MEME analysis with focus on the phylogenetic tree visualization. Use the width (400-2400px) and height (300-1600px) sliders above the tree to adjust dimensions for better viewing of different tree sizes.'
+      }
+    }
+  }
+};
+
+// Story showing tested branches colored on the tree (new feature)
+export const TestedBranchesHighlighted: Story = {
+  args: {
+    data: memeTestData,
+    pvalueThreshold: 0.1,
+    showColumns: ['Diversifying', 'Neutral', 'Invariable'],
+    plotType: 'p-values for selection'
+  },
+  parameters: {
+    docs: {
+      description: {
+        story: 'MEME analysis with tested branches highlighted on the phylogenetic tree. Tested branches are shown in red, background branches in gray. This is the default view when tested branch data is available.'
+      }
+    }
+  }
+};
+
+// Story without tested branches data (for comparison)
+export const WithoutTestedBranches: Story = {
+  args: {
+    data: memeTestDataNoTestedBranches,
+    pvalueThreshold: 0.1,
+    showColumns: ['Diversifying', 'Neutral', 'Invariable'],
+    plotType: 'p-values for selection'
+  },
+  parameters: {
+    docs: {
+      description: {
+        story: 'MEME analysis without tested branch information. The tree uses default coloring options (none, branch length, or bootstrap).'
       }
     }
   }
