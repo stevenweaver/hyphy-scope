@@ -8,26 +8,91 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import * as d3 from 'd3';
-  import type { FubarResults, FubarSiteData } from './utils/fubar-utils.js';
-  import {
-    getFubarSummary,
-    getFubarSiteData,
-    getPartitionColumn,
-    getTreeNewick
-  } from './utils/fubar-utils.js';
   import { phylotree } from 'phylotree';
+  import {
+    parseFubarJSON,
+    getTreeNewick,
+    type ParsedFubar,
+    type FubarParsedSite,
+    type FubarMeta
+  } from './utils/fubar-utils.js';
+  import {
+    plotManhattan,
+    plotRates,
+    plotHeatmap,
+    plotSitePosterior
+  } from './utils/fubar-plots.js';
 
-  export let data: FubarResults;
+  export let data: any = null;
 
-  // Reactive data processing
-  $: summary = data ? getFubarSummary(data, posteriorProbability) : null;
-  $: siteData = data ? getFubarSiteData(data) : [];
-  $: partitionColumn = data ? getPartitionColumn(data) : [];
+  // Parsed data
+  let parsed: ParsedFubar | null = null;
+  let meta: FubarMeta = { sequences: 0, codons: 0, filename: "Unknown", treeLength: 0, settings: {}, isBStill: false };
+  let sites: FubarParsedSite[] = [];
+
+  $: if (data) {
+    try {
+      parsed = parseFubarJSON(data);
+      meta = parsed.meta;
+      sites = parsed.sites;
+    } catch (e) {
+      console.error("[FUBAR] Parse error:", e);
+      parsed = null;
+      sites = [];
+    }
+  } else {
+    parsed = null;
+    sites = [];
+  }
 
   // Controls
-  let posteriorProbability = 0.9;
-  let selectedSite: number | null = null;
-  let inputError = false;
+  let threshold = 0.9;
+  let evidenceType: 'probability' | 'bayesFactor' = 'probability';
+
+  // B-STILL metric options
+  const metricOptions = [
+    { value: 'positive', label: 'Positive Selection', prob: 'probPos', bf: 'bfPos' },
+    { value: 'invariant', label: 'Invariant (α=β=0)', prob: 'probInv', bf: 'ebfInv' },
+    { value: 'alpha0', label: 'Alpha Zero (α=0)', prob: 'probAlpha0', bf: 'ebfAlpha0' },
+    { value: 'beta0', label: 'Beta Zero (β=0)', prob: 'probBeta0', bf: 'ebfBeta0' },
+    { value: 'proximal', label: 'Proximal (α,β≈0)', prob: 'probProx', bf: 'ebfProx' }
+  ];
+  let selectedMetricIdx = 0;
+  $: availableMetrics = meta.isBStill ? metricOptions : [metricOptions[0]];
+  $: currentMetric = availableMetrics[selectedMetricIdx] || availableMetrics[0];
+  $: activeMetricKey = evidenceType === 'probability' ? currentMetric.prob : currentMetric.bf;
+  $: effectiveThreshold = evidenceType === 'bayesFactor' ? 10 : threshold;
+
+  // Significant sites
+  $: sigSites = sites.filter(d => {
+    const val = d[activeMetricKey];
+    return val !== undefined && val >= effectiveThreshold;
+  });
+
+  // Site table sorting
+  let sortColumn = 'site';
+  let sortAsc = true;
+
+  $: sortedSigSites = [...sigSites].sort((a, b) => {
+    const av = a[sortColumn] as number, bv = b[sortColumn] as number;
+    if (typeof av === 'number' && typeof bv === 'number') return sortAsc ? av - bv : bv - av;
+    return 0;
+  });
+
+  function toggleSort(col: string) {
+    if (sortColumn === col) sortAsc = !sortAsc;
+    else { sortColumn = col; sortAsc = true; }
+  }
+
+  // Heatmap scale
+  let heatmapScale: 'log' | 'linear' | 'sqrt' = 'log';
+
+  // Site deep dive
+  let deepDiveSite = 1;
+  $: deepDiveSiteIdx = deepDiveSite - 1;
+  $: deepDiveSiteData = sites.length > 0 && deepDiveSite >= 1 && deepDiveSite <= sites.length
+    ? sites[deepDiveSiteIdx]
+    : null;
 
   // Tree controls
   let showTree = true;
@@ -35,273 +100,69 @@
   let treeHeight = 600;
   let showScale = true;
 
-  // Visualization refs
-  let vizContainer: HTMLDivElement;
+  // Plot containers
+  let manhattanContainer: HTMLDivElement;
+  let ratesContainer: HTMLDivElement;
+  let heatmapContainer: HTMLDivElement;
+  let sitePosteriorContainer: HTMLDivElement;
+  let globalPriorContainer: HTMLDivElement;
   let treeContainer: HTMLDivElement;
 
+  let mounted = false;
+  onMount(() => { mounted = true; });
+
   // Formatting
-  const formatter = d3.format(".3f");
+  const fmt = d3.format(".4f");
+  const fmt3 = d3.format(".3f");
 
-  // Table data with highlighting
-  $: tableData = siteData.map((row, index) => {
-    const isPositive = row['Prob[α<β]'] > posteriorProbability;
-    const isNegative = row['Prob[α>β]'] > posteriorProbability;
-    const className = isPositive ? 'positive-selection-row' :
-                     isNegative ? 'negative-selection-row' : '';
-    return {
-      ...row,
-      className
-    };
-  });
-
-  // Sort state
-  let sortColumn: string | null = null;
-  let sortAscending = true;
-
-  // Sorted and paginated table data
-  $: sortedTableData = (() => {
-    if (!sortColumn) return tableData;
-    return [...tableData].sort((a, b) => {
-      const aVal = a[sortColumn as keyof typeof a];
-      const bVal = b[sortColumn as keyof typeof b];
-      const comparison = aVal < bVal ? -1 : aVal > bVal ? 1 : 0;
-      return sortAscending ? comparison : -comparison;
-    });
-  })();
-
-  // Pagination
-  let currentPage = 1;
-  let rowsPerPage = 20;
-  $: totalPages = Math.ceil(sortedTableData.length / rowsPerPage);
-  $: paginatedData = sortedTableData.slice(
-    (currentPage - 1) * rowsPerPage,
-    currentPage * rowsPerPage
-  );
-
-  function handleSort(column: string) {
-    if (sortColumn === column) {
-      sortAscending = !sortAscending;
-    } else {
-      sortColumn = column;
-      sortAscending = true;
+  function renderToContainer(container: HTMLDivElement | undefined, plotFn: () => any) {
+    if (!container) return;
+    container.innerHTML = '';
+    try {
+      const el = plotFn();
+      if (el) container.appendChild(el);
+    } catch (e) {
+      console.error("[FUBAR] Plot render error:", e);
     }
   }
 
-  function handleSiteInput(e: Event) {
-    const target = e.target as HTMLInputElement;
-    const value = target.value;
-
-    if (value === '' || value === '0') {
-      selectedSite = null;
-      inputError = false;
-      return;
-    }
-
-    if (!/^\d+$/.test(value)) {
-      inputError = true;
-      return;
-    }
-
-    const siteNum = parseInt(value);
-    if (siteNum > 0 && siteNum <= (data?.input?.['number of sites'] || 0)) {
-      selectedSite = siteNum;
-      inputError = false;
-    } else {
-      inputError = true;
-    }
+  // Manhattan plot
+  $: if (mounted && sites.length > 0) {
+    renderToContainer(manhattanContainer, () =>
+      plotManhattan(sites, { width: 900, threshold: effectiveThreshold, metric: activeMetricKey })
+    );
   }
 
-  // Render the posterior distribution plot
-  function renderPosteriorPlot() {
-    if (!data?.grid || !vizContainer) return;
-
-    // Clear previous content
-    d3.select(vizContainer).html('');
-
-    // Get grid data
-    const gridData = selectedSite ? getGridDataForSite(selectedSite) : data.grid;
-    const nGridpoints = Math.sqrt(gridData.length);
-    const gridpoints = gridData.map(row => +row[1].toFixed(2)).slice(0, nGridpoints);
-
-    const margin = { top: 15, right: 75, bottom: 75, left: 75 };
-    const width = 800 - margin.left - margin.right;
-    const height = 800 - margin.top - margin.bottom;
-
-    const svg = d3.select(vizContainer)
-      .append('svg')
-      .attr('width', width + margin.left + margin.right)
-      .attr('height', height + margin.top + margin.bottom);
-
-    svg.append('rect')
-      .attr('width', width + margin.left + margin.right)
-      .attr('height', height + margin.top + margin.bottom)
-      .attr('fill', 'white');
-
-    const main = svg.append('g')
-      .attr('id', 'fubar-main')
-      .attr('transform', `translate(${margin.left},${margin.top})`);
-
-    // Scales
-    const x = d3.scalePoint()
-      .domain(gridpoints.map(String))
-      .range([0, width])
-      .padding(0.5);
-
-    const y = d3.scalePoint()
-      .domain(gridpoints.map(String))
-      .range([height, 0])
-      .padding(0.5);
-
-    // Color scale: blue (purifying) -> white (neutral) -> red (positive)
-    const color = d3.scaleLinear()
-      .domain([0, 0.5, 1, 2, 10])
-      .range(['#2166ac', '#67a9cf', '#f7f7f7', '#ef8a62', '#b2182b'] as any)
-      .clamp(true);
-
-    const magnitude = d3.scaleLinear()
-      .domain([0, d3.max(gridData, d => +d[2]) || 1])
-      .range([0, width / nGridpoints]);
-
-    // Draw circles
-    main.selectAll('.dot')
-      .data(gridData)
-      .enter()
-      .append('circle')
-      .attr('cx', d => x(d[0].toFixed(2)) || 0)
-      .attr('cy', d => y(d[1].toFixed(2)) || 0)
-      .attr('r', d => magnitude(+d[2]) / 2)
-      .attr('fill', d => color(+d[1] / (+d[0] + 0.001)));
-
-    // Axes
-    const xAxis = d3.axisBottom(x);
-    const yAxis = d3.axisLeft(y);
-
-    main.append('g')
-      .style('font', '12px')
-      .attr('transform', `translate(0,${height})`)
-      .attr('class', 'axis x-axis')
-      .call(xAxis);
-
-    main.append('g')
-      .attr('class', 'axis')
-      .call(yAxis);
-
-    d3.selectAll('.x-axis > .tick > text')
-      .attr('transform', 'rotate(-90) translate(-20, -15)');
-
-    // Axis labels
-    main.append('text')
-      .attr('transform', `translate(${width / 2},${height + 55})`)
-      .attr('text-anchor', 'middle')
-      .style('font-weight', 'bold')
-      .text('Synonymous substitution rate (α)');
-
-    main.append('text')
-      .attr('transform', `translate(-45,${height / 2}) rotate(-90)`)
-      .attr('text-anchor', 'middle')
-      .style('font-weight', 'bold')
-      .text('Non-synonymous substitution rate (β)');
-
-    // Color bar
-    const linearGradient = svg.append('defs')
-      .append('linearGradient')
-      .attr('id', 'colorbar-gradient')
-      .attr('x1', '0%')
-      .attr('x2', '0%')
-      .attr('y1', '0%')
-      .attr('y2', '100%');
-
-    // Gradient: top (high ω) = red, middle (ω=1) = white, bottom (low ω) = blue
-    linearGradient.append('stop')
-      .attr('offset', '0%')
-      .attr('stop-color', '#b2182b'); // High ω (positive selection)
-
-    linearGradient.append('stop')
-      .attr('offset', '25%')
-      .attr('stop-color', '#ef8a62'); // ω > 1
-
-    linearGradient.append('stop')
-      .attr('offset', '50%')
-      .attr('stop-color', '#f7f7f7'); // ω = 1 (neutral)
-
-    linearGradient.append('stop')
-      .attr('offset', '75%')
-      .attr('stop-color', '#67a9cf'); // ω < 1
-
-    linearGradient.append('stop')
-      .attr('offset', '100%')
-      .attr('stop-color', '#2166ac'); // Low ω (purifying selection)
-
-    const colorbar = svg.append('g')
-      .attr('transform', `translate(${margin.left + width},${margin.top})`);
-
-    colorbar.append('rect')
-      .attr('fill', 'url(#colorbar-gradient)')
-      .attr('x', 5)
-      .attr('y', 0)
-      .attr('width', 20)
-      .attr('height', height);
-
-    colorbar.append('text')
-      .attr('x', 15)
-      .attr('y', height + 15)
-      .attr('text-anchor', 'middle')
-      .text('ω');
-
-    const colorbarScale = d3.scaleLinear()
-      .domain([0, 0.5, 1, 2, 10])
-      .range([height, height * 0.75, height / 2, height * 0.25, 0]);
-
-    const colorbarAxis = d3.axisRight(colorbarScale)
-      .tickValues([0, 0.5, 1, 2, 10])
-      .tickFormat(d3.format('.1f'));
-
-    colorbar.append('g')
-      .attr('class', 'axis')
-      .attr('transform', 'translate(25,0)')
-      .call(colorbarAxis);
+  // Rates plot
+  $: if (mounted && sites.length > 0) {
+    renderToContainer(ratesContainer, () => plotRates(sites, { width: 900 }));
   }
 
-  function getGridDataForSite(site: number): number[][] {
-    if (!data?.posterior || !data?.['data partitions']) return data.grid;
-
-    // Find partition and index for this site
-    let partition = 0;
-    let index = -1;
-    const partitions = Object.values(data['data partitions']);
-
-    for (let p = 0; p < partitions.length; p++) {
-      const coverage = partitions[p].coverage[0];
-      const idx = coverage.indexOf(site - 1);
-      if (idx > -1) {
-        partition = p;
-        index = idx;
-        break;
-      }
-    }
-
-    if (index === -1) return data.grid;
-
-    // Get site-specific posterior
-    const sitePosterior = data.posterior[partition][index][0];
-
-    // Combine with grid coordinates
-    return data.grid.map((d, i) => [
-      d[0],
-      d[1],
-      sitePosterior[i]
-    ]);
+  // Heatmap
+  $: if (mounted && parsed?.grid) {
+    renderToContainer(heatmapContainer, () =>
+      plotHeatmap(parsed!.grid, { width: 800, scaleType: heatmapScale })
+    );
   }
 
+  // Site posterior
+  $: if (mounted && parsed?.grid && deepDiveSiteData) {
+    renderToContainer(sitePosteriorContainer, () =>
+      plotSitePosterior(deepDiveSiteIdx, parsed!.grid, parsed!.posterior, { width: 500 })
+    );
+    renderToContainer(globalPriorContainer, () =>
+      plotHeatmap(parsed!.grid, { width: 500, title: "Global Prior" })
+    );
+  }
+
+  // Tree rendering
   function renderTree() {
     if (!data || !treeContainer) return;
-
     const newick = getTreeNewick(data);
     if (!newick) return;
 
     try {
       const tree = new phylotree(newick);
-
       const renderedTree = tree.render({
         container: '.fubar-tree-container',
         height: treeHeight,
@@ -313,7 +174,6 @@
         'show-menu': false,
         selectable: false
       });
-
       treeContainer.innerHTML = '';
       treeContainer.appendChild(renderedTree.show());
     } catch (error) {
@@ -321,24 +181,27 @@
     }
   }
 
-  // Export to CSV
+  $: if (mounted && showTree && treeContainer && data) {
+    renderTree();
+  }
+
+  // CSV Export
   function exportToCSV() {
-    const headers = ['Site', 'Partition', 'α', 'β', 'α-β', 'Prob[α>β]', 'Prob[α<β]'];
-    const rows = tableData.map(row => [
-      row.Site,
-      row.Partition,
-      formatter(row.α),
-      formatter(row.β),
-      formatter(row['α-β']),
-      formatter(row['Prob[α>β]']),
-      formatter(row['Prob[α<β]'])
-    ]);
+    const baseCols = ['Site', 'α', 'β', 'α-β', 'Prob[α<β]'];
+    const bstillCols = meta.isBStill
+      ? ['Prob[α=β=0]', 'EBF[α=β=0]', 'Prob[α,β≈0]', 'EBF[α,β≈0]']
+      : [];
+    const headers = [...baseCols, ...bstillCols];
 
-    const csv = [
-      headers.join(','),
-      ...rows.map(row => row.join(','))
-    ].join('\n');
+    const rows = sites.map(s => {
+      const base = [s.site, fmt3(s.alpha), fmt3(s.beta), fmt3(s.diff), fmt(s.probPos)];
+      const extra = meta.isBStill
+        ? [fmt(s.probInv ?? 0), fmt(s.ebfInv ?? 0), fmt(s.probProx ?? 0), fmt(s.ebfProx ?? 0)]
+        : [];
+      return [...base, ...extra];
+    });
 
+    const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
     const blob = new Blob([csv], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -347,151 +210,466 @@
     a.click();
     URL.revokeObjectURL(url);
   }
-
-  onMount(() => {
-    renderPosteriorPlot();
-    if (showTree) {
-      renderTree();
-    }
-  });
-
-  $: if (selectedSite !== undefined || posteriorProbability) {
-    renderPosteriorPlot();
-  }
-
-  $: if (showTree && treeContainer) {
-    renderTree();
-  }
 </script>
 
+<div class="fubar-visualization">
+  {#if !data}
+    <div class="loading">Loading FUBAR data...</div>
+  {:else}
+    <!-- Section 1: Summary Header -->
+    <section class="section">
+      <h2>FUBAR {meta.isBStill ? '(B-STILL)' : ''} Analysis Results</h2>
+      <p class="description">
+        <strong>{meta.isBStill ? 'B-STILL' : 'FUBAR'}</strong> —
+        {meta.isBStill
+          ? 'Bayesian Significance Test of Invariant Low Likelihoods'
+          : 'Fast Unconstrained Bayesian AppRoximation for inferring selection'}
+      </p>
+
+      <div class="summary-tiles">
+        <div class="tile">
+          <div class="tile-number">{meta.sequences}</div>
+          <div class="tile-label">seqs</div>
+          <div class="tile-separator">&times;</div>
+          <div class="tile-number">{meta.codons}</div>
+          <div class="tile-label">codons</div>
+        </div>
+        <div class="tile">
+          <div class="tile-number">{meta.treeLength ? meta.treeLength.toFixed(2) : "-"}</div>
+          <div class="tile-label">total subs/site</div>
+        </div>
+        <div class="tile">
+          <div class="tile-number" class:sig-color={sigSites.length > 0}>
+            {sigSites.length}
+            <span class="tile-label">/ {sites.length} total</span>
+          </div>
+          <div class="tile-label">significant sites</div>
+        </div>
+      </div>
+
+      {#if meta.settings}
+        <div class="settings-info">
+          <strong>Method:</strong> {meta.settings.method || 'MCMC'}
+          {#if meta.settings.chains} | <strong>Chains:</strong> {meta.settings.chains}{/if}
+          {#if meta.settings['chain-length']} | <strong>Length:</strong> {meta.settings['chain-length'].toLocaleString()}{/if}
+          {#if meta.settings['grid size']} | <strong>Grid:</strong> {meta.settings['grid size']}×{meta.settings['grid size']}{/if}
+        </div>
+      {/if}
+
+      <div class="controls">
+        {#if meta.isBStill}
+          <label>
+            Metric:
+            <select bind:value={selectedMetricIdx}>
+              {#each availableMetrics as m, i}
+                <option value={i}>{m.label}</option>
+              {/each}
+            </select>
+          </label>
+        {/if}
+
+        <label>
+          Evidence:
+          <select bind:value={evidenceType}>
+            <option value="probability">Posterior Probability</option>
+            <option value="bayesFactor">Bayes Factor</option>
+          </select>
+        </label>
+
+        {#if evidenceType === 'probability'}
+          <label>
+            Threshold:
+            <input type="range" bind:value={threshold} min="0.5" max="0.999" step="0.01" />
+            <span class="threshold-value">{threshold.toFixed(2)}</span>
+          </label>
+        {:else}
+          <label>
+            BF Threshold:
+            <input type="number" bind:value={effectiveThreshold} min="1" step="1" />
+          </label>
+        {/if}
+      </div>
+    </section>
+
+    <!-- Section 2: Significant Sites Table -->
+    <section class="section">
+      <h2>Significant Sites ({sigSites.length})</h2>
+
+      {#if sigSites.length > 0}
+        <div class="table-wrapper">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th on:click={() => toggleSort('site')}>Site</th>
+                <th on:click={() => toggleSort('alpha')}>α</th>
+                <th on:click={() => toggleSort('beta')}>β</th>
+                <th on:click={() => toggleSort('probPos')}>Prob[α&lt;β]</th>
+                {#if meta.isBStill}
+                  <th on:click={() => toggleSort('probInv')}>Prob[Inv]</th>
+                  <th on:click={() => toggleSort('ebfInv')}>EBF[Inv]</th>
+                  <th on:click={() => toggleSort('probProx')}>Prob[Prox]</th>
+                  <th on:click={() => toggleSort('ebfProx')}>EBF[Prox]</th>
+                {/if}
+              </tr>
+            </thead>
+            <tbody>
+              {#each sortedSigSites as site}
+                <tr>
+                  <td>{site.site}</td>
+                  <td>{fmt3(site.alpha)}</td>
+                  <td>{fmt3(site.beta)}</td>
+                  <td class:sig-cell={site.probPos >= threshold}>{fmt(site.probPos)}</td>
+                  {#if meta.isBStill}
+                    <td class:sig-cell={(site.probInv ?? 0) >= threshold}>{fmt(site.probInv ?? 0)}</td>
+                    <td>{fmt(site.ebfInv ?? 0)}</td>
+                    <td class:sig-cell={(site.probProx ?? 0) >= threshold}>{fmt(site.probProx ?? 0)}</td>
+                    <td>{fmt(site.ebfProx ?? 0)}</td>
+                  {/if}
+                </tr>
+              {/each}
+            </tbody>
+          </table>
+        </div>
+      {:else}
+        <div class="empty-state">No sites exceed the current threshold.</div>
+      {/if}
+    </section>
+
+    <!-- Section 3: Visualizations -->
+    <section class="section">
+      <h2>Visualizations</h2>
+
+      <div class="card">
+        <h3>Manhattan Plot</h3>
+        <div class="plot-container" bind:this={manhattanContainer}></div>
+      </div>
+
+      <div class="card">
+        <h3>Site-level Rates</h3>
+        <div class="plot-container" bind:this={ratesContainer}></div>
+      </div>
+
+      <div class="card">
+        <h3>Rate Distribution Heatmap</h3>
+        <div class="controls">
+          <label>
+            Scale:
+            <select bind:value={heatmapScale}>
+              <option value="log">Log</option>
+              <option value="linear">Linear</option>
+              <option value="sqrt">Sqrt</option>
+            </select>
+          </label>
+        </div>
+        <div class="plot-container" bind:this={heatmapContainer}></div>
+      </div>
+    </section>
+
+    <!-- Section 4: Site Deep Dive -->
+    <section class="section">
+      <h2>Site Deep Dive</h2>
+
+      <div class="controls">
+        <label>
+          Site:
+          <input
+            type="number"
+            bind:value={deepDiveSite}
+            min="1"
+            max={sites.length}
+            style="width: 80px;"
+          />
+          <span class="muted">/ {sites.length}</span>
+        </label>
+      </div>
+
+      {#if deepDiveSiteData}
+        <div class="deep-dive-layout">
+          <div class="deep-dive-sidebar">
+            <div class="card">
+              <h3>Site {deepDiveSite} Statistics</h3>
+              <table class="stats-table">
+                <tbody>
+                  <tr><td class="muted">α (synonymous)</td><td class="bold right">{fmt3(deepDiveSiteData.alpha)}</td></tr>
+                  <tr><td class="muted">β (non-synonymous)</td><td class="bold right">{fmt3(deepDiveSiteData.beta)}</td></tr>
+                  <tr><td class="muted">β - α</td><td class="bold right">{fmt3(deepDiveSiteData.diff)}</td></tr>
+                  <tr><td class="muted">Prob[α &lt; β]</td><td class="bold right">{fmt(deepDiveSiteData.probPos)}</td></tr>
+                  {#if meta.isBStill}
+                    <tr><td class="muted">Prob[Invariant]</td><td class="bold right">{fmt(deepDiveSiteData.probInv ?? 0)}</td></tr>
+                    <tr><td class="muted">EBF[Invariant]</td><td class="bold right">{fmt(deepDiveSiteData.ebfInv ?? 0)}</td></tr>
+                    <tr><td class="muted">Prob[Proximal]</td><td class="bold right">{fmt(deepDiveSiteData.probProx ?? 0)}</td></tr>
+                    <tr><td class="muted">EBF[Proximal]</td><td class="bold right">{fmt(deepDiveSiteData.ebfProx ?? 0)}</td></tr>
+                  {/if}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="deep-dive-main">
+            <div class="card">
+              <h3>Site {deepDiveSite} Posterior</h3>
+              <div class="centered-plot" bind:this={sitePosteriorContainer}></div>
+            </div>
+            <div class="card">
+              <h3>Global Prior</h3>
+              <div class="centered-plot" bind:this={globalPriorContainer}></div>
+            </div>
+          </div>
+        </div>
+      {/if}
+    </section>
+
+    <!-- Section 5: Phylogenetic Tree -->
+    <section class="section">
+      <h2>Phylogenetic Tree</h2>
+
+      <div class="controls">
+        <label class="toggle-label">
+          <input type="checkbox" bind:checked={showTree} />
+          Show Tree
+        </label>
+        <label class="toggle-label">
+          <input type="checkbox" bind:checked={showScale} />
+          Show Scale
+        </label>
+      </div>
+
+      {#if showTree}
+        <div class="fubar-tree-container tree-container" bind:this={treeContainer}></div>
+      {/if}
+    </section>
+
+    <!-- Section 6: CSV Export -->
+    <section class="section">
+      <button class="btn" on:click={exportToCSV}>
+        Export to CSV
+      </button>
+      <p class="description">
+        <small>
+          See <a href="http://www.hyphy.org/methods/selection-methods/#fubar">here</a> for more information about the FUBAR method.
+          <br />
+          Please cite <a href="http://www.ncbi.nlm.nih.gov/pubmed/23420840" target="_blank">PMID 23420840</a> if you use this result in a publication, presentation, or other scientific work.
+        </small>
+      </p>
+    </section>
+  {/if}
+</div>
+
 <style>
-  .fubar-container {
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+  .fubar-visualization {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     max-width: 1200px;
     margin: 0 auto;
-    padding: 20px;
+    padding: 1rem;
   }
 
-  .summary-box {
-    border: 2px solid #007bff;
-    border-left: 0;
-    border-right: 0;
-    padding: 20px;
-    margin: 20px 0;
+  .loading {
+    text-align: center;
+    padding: 2rem;
+    color: #666;
   }
 
-  .highlight {
-    color: #007bff;
-    font-weight: bold;
+  .description {
+    color: #555;
+    margin-bottom: 1.5rem;
   }
 
-  .positive-selection-row {
-    background-color: #d4edda !important;
+  .section {
+    margin-bottom: 3rem;
+    padding-bottom: 2rem;
+    border-bottom: 1px solid #eee;
   }
 
-  .negative-selection-row {
-    background-color: #f8f9fa !important;
+  h2 { margin: 0 0 1rem 0; color: #333; }
+  h3 { margin: 0 0 0.75rem 0; color: #444; font-size: 1rem; }
+
+  /* Summary tiles */
+  .summary-tiles {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+    margin-bottom: 1.5rem;
   }
 
-  .control-group {
-    margin: 20px 0;
-    padding: 15px;
+  .tile {
+    background: #fff;
+    padding: 1rem;
+    border-radius: 4px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    text-align: center;
+    display: flex;
+    align-items: baseline;
+    justify-content: center;
+    gap: 0.25rem;
+    flex-wrap: wrap;
+  }
+
+  .tile-number { font-size: 1.5rem; font-weight: bold; color: #333; }
+  .tile-label { font-size: 0.75rem; color: #888; }
+  .tile-separator { font-size: 1.2rem; color: #aaa; margin: 0 0.25rem; }
+  .sig-color { color: #d93025; }
+
+  .settings-info {
+    font-size: 0.85rem;
+    color: #666;
+    margin-bottom: 1rem;
+    padding: 0.5rem 1rem;
     background: #f8f9fa;
-    border-radius: 5px;
+    border-radius: 4px;
+    border: 1px solid #e9ecef;
   }
 
-  .control-group label {
-    display: block;
-    margin-bottom: 5px;
-    font-weight: 500;
+  /* Controls */
+  .controls {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+    flex-wrap: wrap;
+    margin-bottom: 1rem;
   }
 
-  .input-group {
+  .controls label {
     display: flex;
     align-items: center;
-    gap: 10px;
-    margin: 10px 0;
+    gap: 0.5rem;
+    font-size: 0.9rem;
+    color: #555;
   }
 
-  .input-group input {
-    padding: 5px 10px;
-    border: 1px solid #ddd;
+  .controls input[type="number"] {
+    width: 80px;
+    padding: 4px 8px;
+    border: 1px solid #ccc;
     border-radius: 4px;
   }
 
-  .input-group input.error {
-    border-color: #dc3545;
+  .controls input[type="range"] {
+    width: 120px;
   }
 
-  .alert {
-    padding: 10px 15px;
-    margin: 10px 0;
+  .controls select {
+    padding: 4px 8px;
+    border: 1px solid #ccc;
     border-radius: 4px;
   }
 
-  .alert-danger {
-    background-color: #f8d7da;
-    border: 1px solid #f5c6cb;
-    color: #721c24;
+  .threshold-value {
+    font-weight: bold;
+    min-width: 40px;
+    text-align: center;
   }
 
-  .alert-info {
-    background-color: #d1ecf1;
-    border: 1px solid #bee5eb;
-    color: #0c5460;
+  .toggle-label {
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.9rem;
+    color: #555;
   }
 
-  table {
+  .toggle-label input[type="checkbox"] { width: 16px; height: 16px; cursor: pointer; }
+
+  /* Tables */
+  .table-wrapper { overflow-x: auto; margin-bottom: 1.5rem; }
+
+  .data-table {
     width: 100%;
     border-collapse: collapse;
-    margin: 20px 0;
+    font-size: 0.85rem;
   }
 
-  th, td {
+  .data-table th {
+    background: #f8f9fa;
     padding: 8px 12px;
     text-align: left;
-    border-bottom: 1px solid #ddd;
-  }
-
-  th {
-    background-color: #f8f9fa;
-    font-weight: 600;
+    border-bottom: 2px solid #dee2e6;
     cursor: pointer;
+    white-space: nowrap;
     user-select: none;
   }
 
-  th:hover {
-    background-color: #e9ecef;
+  .data-table th:hover { background: #e9ecef; }
+
+  .data-table td {
+    padding: 6px 12px;
+    border-bottom: 1px solid #eee;
   }
 
-  .pagination {
-    display: flex;
-    justify-content: center;
-    gap: 10px;
-    margin: 20px 0;
+  .sig-cell { color: #d93025; font-weight: bold; }
+
+  .stats-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9rem;
   }
 
-  .pagination button {
-    padding: 5px 10px;
-    border: 1px solid #ddd;
-    background: white;
-    cursor: pointer;
+  .stats-table td { padding: 4px 0; }
+  .muted { color: #888; }
+  .bold { font-weight: bold; }
+  .right { text-align: right; }
+
+  /* Plot containers */
+  .plot-container {
+    min-height: 100px;
+    border: 1px solid #eee;
     border-radius: 4px;
+    padding: 1rem;
+    overflow-x: auto;
+    margin-bottom: 1rem;
   }
 
-  .pagination button:hover:not(:disabled) {
-    background-color: #f8f9fa;
+  .centered-plot {
+    max-width: 500px;
+    margin: 0 auto;
   }
 
-  .pagination button:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
+  /* Cards */
+  .card {
+    background: #fff;
+    padding: 1rem;
+    border-radius: 4px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    margin-bottom: 1rem;
   }
 
-  .pagination button.active {
-    background-color: #007bff;
-    color: white;
-    border-color: #007bff;
+  /* Deep dive layout */
+  .deep-dive-layout {
+    display: flex;
+    gap: 1.5rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .deep-dive-sidebar {
+    flex: 1;
+    min-width: 280px;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .deep-dive-main {
+    flex: 2;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .empty-state {
+    padding: 1rem;
+    text-align: center;
+    color: #999;
+    font-style: italic;
+    font-size: 0.85rem;
+  }
+
+  .tree-container {
+    min-height: 500px;
+    overflow-x: auto;
+    border: 1px solid #eee;
+    border-radius: 4px;
+    padding: 1rem;
+    background: white;
   }
 
   .btn {
@@ -504,208 +682,10 @@
     font-size: 14px;
   }
 
-  .btn:hover {
-    background: #0056b3;
-  }
+  .btn:hover { background: #0056b3; }
 
-  .btn-secondary {
-    background: #6c757d;
-    border-color: #6c757d;
-  }
-
-  .btn-secondary:hover {
-    background: #5a6268;
-  }
-
-  .viz-container {
-    display: flex;
-    justify-content: center;
-    margin: 20px 0;
-  }
-
-  .description {
-    color: #666;
-    font-size: 14px;
-    margin: 10px 0;
-    line-height: 1.6;
-  }
-
-  .tree-controls {
-    display: flex;
-    gap: 15px;
-    flex-wrap: wrap;
-    align-items: center;
-  }
-
-  .checkbox-group {
-    display: flex;
-    align-items: center;
-    gap: 5px;
-  }
-
-  section {
-    margin: 40px 0;
-  }
-
-  h2 {
-    font-size: 24px;
-    margin-bottom: 15px;
-    color: #333;
-  }
-
-  h3 {
-    font-size: 20px;
-    margin-bottom: 10px;
-    color: #555;
+  @media (max-width: 768px) {
+    .deep-dive-layout { flex-direction: column; }
+    .deep-dive-sidebar { min-width: auto; }
   }
 </style>
-
-<div class="fubar-container">
-  <section id="summary-tab">
-    <h2>FUBAR Summary</h2>
-    {#if summary}
-      <div class="summary-box">
-        <p>
-          FUBAR <strong class="highlight">found evidence</strong> of
-        </p>
-        <p>
-          <i>+</i> pervasive positive/diversifying selection at
-          <span class="highlight">{summary.positiveSites}</span> sites
-        </p>
-        <p>
-          <i>−</i> pervasive negative/purifying selection at
-          <span class="highlight">{summary.negativeSites}</span> sites
-        </p>
-        <p>
-          with posterior probability of
-          <input
-            type="number"
-            value={posteriorProbability}
-            min="0"
-            max="1"
-            step="0.01"
-            on:input={(e) => posteriorProbability = parseFloat(e.currentTarget.value)}
-            style="display: inline-block; margin-left: 5px; width: 100px;"
-          />.
-        </p>
-        <hr />
-        <p class="description">
-          <small>
-            See <a href="http://www.hyphy.org/methods/selection-methods/#fubar">here</a> for more information about the FUBAR method.
-            <br />
-            Please cite <a href="http://www.ncbi.nlm.nih.gov/pubmed/23420840" target="_blank">PMID 23420840</a> if you use this result in a publication, presentation, or other scientific work.
-          </small>
-        </p>
-      </div>
-    {/if}
-  </section>
-
-  <section id="plot-tab">
-    <h2>Posterior Rate Distribution</h2>
-
-    {#if inputError}
-      <div class="alert alert-danger">
-        <i>⚠</i> Enter a valid site (a number from 1 to {data?.input?.['number of sites'] || 0}).
-      </div>
-    {/if}
-
-    <div class="control-group">
-      <div class="input-group">
-        <label for="site-input">Site:</label>
-        <input
-          id="site-input"
-          type="text"
-          placeholder="Alignment wide"
-          value={selectedSite || ''}
-          on:input={handleSiteInput}
-          class:error={inputError}
-        />
-      </div>
-    </div>
-
-    <div class="viz-container" bind:this={vizContainer}></div>
-
-    <p class="description">
-      This graph shows the posterior distribution over the discretized rate grid.
-      The size of a dot is proportional to the posterior weight allocated to that gridpoint,
-      and the color shows the intensity of selection (ω = β/α): <strong style="color: #2166ac;">blue</strong> indicates
-      purifying selection (ω &lt; 1), <strong style="color: #f7f7f7; background: #666; padding: 0 4px;">white</strong> indicates
-      neutral evolution (ω ≈ 1), and <strong style="color: #b2182b;">red</strong> indicates positive selection (ω &gt; 1).
-      Site-specific distributions can be viewed by entering a site number in the input box above. When empty,
-      the alignment-wide distribution will be shown.
-    </p>
-  </section>
-
-  <section id="table-tab">
-    <h2>FUBAR Site Table</h2>
-
-    <div style="display: flex; gap: 10px; margin-bottom: 20px;">
-      <div class="alert alert-info" style="flex: 1; background-color: #d4edda;">
-        Positively selected sites with evidence are highlighted in green.
-      </div>
-      <div class="alert alert-info" style="flex: 1; background-color: #f8f9fa;">
-        Negatively selected sites with evidence are highlighted in gray.
-      </div>
-    </div>
-
-    <button class="btn btn-secondary" on:click={exportToCSV}>
-      Export to CSV
-    </button>
-
-    <table>
-      <thead>
-        <tr>
-          <th on:click={() => handleSort('Site')}>Site {sortColumn === 'Site' ? (sortAscending ? '▲' : '▼') : ''}</th>
-          <th on:click={() => handleSort('Partition')}>Partition {sortColumn === 'Partition' ? (sortAscending ? '▲' : '▼') : ''}</th>
-          <th on:click={() => handleSort('α')} title="Synonymous substitution rate">α {sortColumn === 'α' ? (sortAscending ? '▲' : '▼') : ''}</th>
-          <th on:click={() => handleSort('β')} title="Non-synonymous substitution rate">β {sortColumn === 'β' ? (sortAscending ? '▲' : '▼') : ''}</th>
-          <th on:click={() => handleSort('α-β')} title="Difference between α and β">α-β {sortColumn === 'α-β' ? (sortAscending ? '▲' : '▼') : ''}</th>
-          <th on:click={() => handleSort('Prob[α>β]')} title="Probability of negative selection">Prob[α&gt;β] {sortColumn === 'Prob[α>β]' ? (sortAscending ? '▲' : '▼') : ''}</th>
-          <th on:click={() => handleSort('Prob[α<β]')} title="Probability of positive selection">Prob[α&lt;β] {sortColumn === 'Prob[α<β]' ? (sortAscending ? '▲' : '▼') : ''}</th>
-        </tr>
-      </thead>
-      <tbody>
-        {#each paginatedData as row}
-          <tr class={row.className}>
-            <td>{row.Site}</td>
-            <td>{row.Partition}</td>
-            <td>{formatter(row.α)}</td>
-            <td>{formatter(row.β)}</td>
-            <td>{formatter(row['α-β'])}</td>
-            <td>{formatter(row['Prob[α>β]'])}</td>
-            <td>{formatter(row['Prob[α<β]'])}</td>
-          </tr>
-        {/each}
-      </tbody>
-    </table>
-
-    <div class="pagination">
-      <button on:click={() => currentPage = 1} disabled={currentPage === 1}>First</button>
-      <button on:click={() => currentPage--} disabled={currentPage === 1}>Previous</button>
-      <span>Page {currentPage} of {totalPages}</span>
-      <button on:click={() => currentPage++} disabled={currentPage === totalPages}>Next</button>
-      <button on:click={() => currentPage = totalPages} disabled={currentPage === totalPages}>Last</button>
-    </div>
-  </section>
-
-  <section id="tree-tab">
-    <h2>Phylogenetic Tree</h2>
-
-    <div class="control-group">
-      <div class="tree-controls">
-        <div class="checkbox-group">
-          <input type="checkbox" id="show-tree" bind:checked={showTree} />
-          <label for="show-tree">Show Tree</label>
-        </div>
-        <div class="checkbox-group">
-          <input type="checkbox" id="show-scale" bind:checked={showScale} />
-          <label for="show-scale">Show Scale</label>
-        </div>
-      </div>
-    </div>
-
-    {#if showTree}
-      <div class="fubar-tree-container" bind:this={treeContainer}></div>
-    {/if}
-  </section>
-</div>

@@ -13,9 +13,13 @@ export interface FubarResults {
   input: {
     trees: { [key: string]: string } | string[] | string;
     'number of sites': number;
+    'number of sequences'?: number;
+    'file name'?: string;
   };
   fits?: any;
   'branch attributes'?: any;
+  analysis?: any;
+  settings?: any;
 }
 
 export interface FubarSiteData {
@@ -32,6 +36,145 @@ export interface FubarSummary {
   positiveSites: number;
   negativeSites: number;
   totalSites: number;
+}
+
+export interface FubarParsedSite {
+  site: number;
+  alpha: number;
+  beta: number;
+  diff: number;
+  probNeg: number;
+  probPos: number;
+  bfPos: number;
+  probInv?: number;
+  probAlpha0?: number;
+  probBeta0?: number;
+  probProx?: number;
+  ebfInv?: number;
+  ebfAlpha0?: number;
+  ebfBeta0?: number;
+  ebfProx?: number;
+  [key: string]: number | undefined;
+}
+
+export interface FubarMeta {
+  sequences: number;
+  codons: number;
+  filename: string;
+  treeLength: number;
+  settings: any;
+  isBStill: boolean;
+}
+
+export interface ParsedFubar {
+  meta: FubarMeta;
+  sites: FubarParsedSite[];
+  grid: number[][];
+  posterior: any;
+  raw: any;
+}
+
+// Crameri's Batlow color ramp (approximated, 15 stops)
+export const batlow = [
+  "#001959", "#0d2a63", "#1a3b6d", "#274c77", "#345d81",
+  "#416e8b", "#4e7f95", "#5b909f", "#68a1a9", "#75b2b3",
+  "#82c3bd", "#8fd4c7", "#9be5d1", "#a8f6db", "#b5ffe5"
+];
+
+export function parseFubarJSON(json: any): ParsedFubar {
+  if (!json || !json.MLE || !json.MLE.content || !json.MLE.content["0"]) {
+    throw new Error("Invalid FUBAR JSON format");
+  }
+
+  const input = json.input || {};
+  const headers: Array<[string, string]> = json.MLE.headers;
+  const content: number[][] = json.MLE.content["0"];
+  const branchAttributes = json["branch attributes"] || {};
+  const analysisInfo = json.analysis || {};
+  const isBStill = !!(
+    (analysisInfo.info && analysisInfo.info.includes("B-STILL")) ||
+    (analysisInfo.version && analysisInfo.version.includes("B-STILL"))
+  );
+
+  const colMap: Record<string, number> = {};
+  headers.forEach((h, i) => {
+    const label = h[0];
+    if (label === "alpha") colMap.alpha = i;
+    if (label === "beta") colMap.beta = i;
+    if (label === "beta-alpha") colMap.diff = i;
+    if (label === "Prob[alpha>beta]") colMap.probNeg = i;
+    if (label === "Prob[alpha<beta]") colMap.probPos = i;
+    if (label === "BayesFactor[alpha<beta]") colMap.bfPos = i;
+    // B-STILL specific
+    if (label === "Prob[alpha=beta=0]") colMap.probInv = i;
+    if (label === "Prob[alpha=0]") colMap.probAlpha0 = i;
+    if (label === "Prob[beta=0]") colMap.probBeta0 = i;
+    if (label === "Prob[alpha,beta~0]") colMap.probProx = i;
+    if (label === "EBF[alpha=beta=0]") colMap.ebfInv = i;
+    if (label === "EBF[alpha=0]") colMap.ebfAlpha0 = i;
+    if (label === "EBF[beta=0]") colMap.ebfBeta0 = i;
+    if (label === "EBF[alpha,beta~0]") colMap.ebfProx = i;
+  });
+
+  const sites: FubarParsedSite[] = content.map((row, i) => ({
+    site: i + 1,
+    alpha: row[colMap.alpha],
+    beta: row[colMap.beta],
+    diff: row[colMap.diff] ?? (row[colMap.beta] - row[colMap.alpha]),
+    probNeg: row[colMap.probNeg],
+    probPos: row[colMap.probPos],
+    bfPos: row[colMap.bfPos],
+    probInv: row[colMap.probInv],
+    probAlpha0: row[colMap.probAlpha0],
+    probBeta0: row[colMap.probBeta0],
+    probProx: row[colMap.probProx],
+    ebfInv: row[colMap.ebfInv],
+    ebfAlpha0: row[colMap.ebfAlpha0],
+    ebfBeta0: row[colMap.ebfBeta0],
+    ebfProx: row[colMap.ebfProx]
+  }));
+
+  const meta: FubarMeta = {
+    sequences: input["number of sequences"] || 0,
+    codons: input["number of sites"] || 0,
+    filename: input["file name"] || "Unknown",
+    treeLength: calculateTreeLength(branchAttributes),
+    settings: json.settings || {},
+    isBStill
+  };
+
+  // Robust posterior extraction
+  let posterior = json.posterior || {};
+  const topKeys = Object.keys(posterior);
+  if (topKeys.length > 0) {
+    const firstValue = posterior[topKeys[0]];
+    if (typeof firstValue === "object" && !Array.isArray(firstValue)) {
+      // Already in {partition: {site: weights}} format
+    } else {
+      posterior = { "0": posterior };
+    }
+  }
+
+  return { meta, sites, grid: json.grid, posterior, raw: json };
+}
+
+export function calculateTreeLength(branchAttributes: any): number {
+  if (!branchAttributes || !branchAttributes["0"]) return 0;
+  const branches = branchAttributes["0"];
+  let totalLength = 0;
+  const firstBranch = Object.values(branches)[0] as any;
+  if (!firstBranch) return 0;
+  const lengthKey = Object.keys(firstBranch).find(
+    k => k !== "original name" && typeof firstBranch[k] === "number"
+  );
+  if (!lengthKey) return 0;
+
+  for (const branchName in branches) {
+    const attr = branches[branchName] as any;
+    const key = attr["Nucleotide GTR"] !== undefined ? "Nucleotide GTR" : lengthKey;
+    if (attr[key] !== undefined) totalLength += attr[key];
+  }
+  return totalLength;
 }
 
 /**

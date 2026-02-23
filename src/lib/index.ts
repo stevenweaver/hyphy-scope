@@ -22,6 +22,7 @@ export * from './utils/meme-plots.js';
 export * from './utils/absrel-utils.js';
 export * from './utils/absrel-plots.js';
 export * from './utils/fubar-utils.js';
+export * from './utils/fubar-plots.js';
 export * from './utils/multi-hit-utils.js';
 export * from './utils/prime-utils.js';
 export * from './utils/prime-plots.js';
