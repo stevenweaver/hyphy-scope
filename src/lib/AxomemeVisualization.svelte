@@ -36,6 +36,13 @@
 	} from './utils/axomeme-plots.js';
 
 	export let data: AxomemeResult | null = null;
+	/**
+	 * Mark the results as coming from a model still under development.
+	 *
+	 * A prop rather than a hard-coded badge: this library should not assert the maturity of somebody
+	 * else's model, and the answer changes over time without this component changing at all.
+	 */
+	export let beta: boolean = false;
 	export let plotType: string = 'Ranked sites';
 	/** Show only sites the model called, which is what most readers want first. */
 	export let onlyCalled: boolean = true;
@@ -117,7 +124,16 @@
 {:else}
 	<div class="axomeme-visualization">
 		<header class="axomeme-header">
-			<h3>AxoMEME predictions</h3>
+			<h3>
+				AxoMEME predictions
+				{#if beta}
+					<span
+						class="axomeme-beta"
+						title="The underlying model is still under active development; results may change between releases."
+						>Beta</span
+					>
+				{/if}
+			</h3>
 			<p>
 				A neural model ranks the sites of this alignment by how MEME-like their signal looks. MEME
 				was not run. The score orders sites <em>within this alignment</em> and is not calibrated to
@@ -244,6 +260,22 @@
 		color: #64748b;
 		font-style: italic;
 	}
+	.axomeme-beta {
+		display: inline-flex;
+		align-items: center;
+		vertical-align: middle;
+		margin-left: 0.5rem;
+		padding: 2px 8px;
+		background: #ede9fe;
+		border: 1px solid #8b5cf6;
+		border-radius: 12px;
+		font-size: 11px;
+		font-weight: 500;
+		color: #5b21b6;
+		text-transform: uppercase;
+		letter-spacing: 0.025em;
+	}
+
 	.axomeme-header h3 {
 		margin: 0 0 0.25rem;
 		font-size: 1.125rem;
