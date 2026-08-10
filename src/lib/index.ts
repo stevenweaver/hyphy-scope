@@ -14,6 +14,7 @@ export { default as FubarVisualization } from './FubarVisualization.svelte';
 export { default as MultiHitVisualization } from './MultiHitVisualization.svelte';
 export { default as PhylogeneticTreeViewer } from './PhylogeneticTreeViewer.svelte';
 export { default as PrimeVisualization } from './PrimeVisualization.svelte';
+export { default as AxomemeVisualization } from './AxomemeVisualization.svelte';
 
 // Export utilities
 export * from './utils/fel-plots.js';
@@ -26,6 +27,8 @@ export * from './utils/fubar-plots.js';
 export * from './utils/multi-hit-utils.js';
 export * from './utils/prime-utils.js';
 export * from './utils/prime-plots.js';
+export * from './utils/axomeme-utils.js';
+export * from './utils/axomeme-plots.js';
 
 // Data utilities
 export { loadDataFromUrl, loadDataFromStorage, getTestData } from './data/data-loader.js';
