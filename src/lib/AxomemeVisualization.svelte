@@ -53,6 +53,24 @@
 	let sortColumn: keyof AxomemeSiteData = 'lrt';
 	let sortDirection: 'asc' | 'desc' = 'desc';
 
+	/**
+	 * Reset the table position when the ANALYSIS changes.
+	 *
+	 * A results pane swaps `data` without remounting this component, so every piece of local state
+	 * survives. For a sort column or a plot choice that is correct — they are preferences. For a page
+	 * number it is not: it is a position inside one particular dataset, and carrying it across drops
+	 * the reader into the middle of a different analysis's table. Measured before this guard existed:
+	 * viewing rows 26–50 of one analysis and then opening another showed rows 26–50 of that one.
+	 *
+	 * Keyed on identity rather than contents. Two analyses can have the same number of sites, so
+	 * length is not enough to tell them apart.
+	 */
+	let lastData: AxomemeResult | null = null;
+	$: if (data !== lastData) {
+		lastData = data;
+		currentPage = 1;
+	}
+
 	$: sites = data?.sites ?? [];
 	$: attributes = getAxomemeAttributes(data);
 	$: tiers = assignTiers(sites);

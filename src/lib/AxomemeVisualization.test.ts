@@ -94,6 +94,32 @@ describe("AxomemeVisualization", () => {
     expect(screen.queryByText(/Tier 1 \(High\)/)).not.toBeInTheDocument();
   });
 
+  it("resets the table position when the analysis changes", async () => {
+    // The results pane updates `data` without remounting, so local state survives. A page number is a
+    // position inside ONE dataset; carrying it across drops the reader into the middle of a different
+    // analysis's table. Sort column and plot choice are preferences and deliberately DO persist.
+    const many = (n: number) => ({
+      modelVersion: "x",
+      sites: Array.from({ length: n }, (_, i) => site(i + 1)),
+      summary: {},
+    });
+    const { rerender, container } = render(AxomemeVisualization, {
+      props: { data: many(200), onlyCalled: false },
+    });
+    const buttons = container.querySelectorAll(".axomeme-pagination button");
+    (buttons[1] as HTMLButtonElement).click();
+    await new Promise((r) => setTimeout(r, 20));
+    expect(
+      container.querySelector(".axomeme-pagination span")?.textContent,
+    ).toMatch(/26/);
+
+    await rerender({ data: many(200), onlyCalled: false });
+    await new Promise((r) => setTimeout(r, 20));
+    expect(
+      container.querySelector(".axomeme-pagination span")?.textContent?.trim(),
+    ).toMatch(/^1–/);
+  });
+
   it("marks results as Beta only when asked to", () => {
     // A prop rather than a hard-coded badge: this library should not assert the maturity of
     // somebody else's model, and the answer changes over time without this component changing.
