@@ -72,6 +72,15 @@
 	}
 
 	$: sites = data?.sites ?? [];
+
+	// Whether this result carries the per-site rate heads.
+	//
+	// The v1-viral model exports only `lrt`; the retired 2.0 export also returned alpha / beta_pos /
+	// p_neg, which is where dS, dN+ and p came from. Rather than delete the columns, they are shown
+	// only when the data actually has them — results produced by 2.0 are still sitting in users'
+	// IndexedDB, and those should keep rendering everything they recorded. Keying on the data, not
+	// on a version string, means neither model needs to be named here.
+	$: hasRates = sites.some((s) => s?.alphaDs !== undefined || s?.betaPosDn !== undefined);
 	$: attributes = getAxomemeAttributes(data);
 	$: tiers = assignTiers(sites);
 	$: scored = getScoredSites(sites);
@@ -208,8 +217,10 @@
 						<th on:click={() => toggleSort('percentile')} class="num">Percentile</th>
 						<th on:click={() => toggleSort('lrt')} class="num">Score</th>
 						<th on:click={() => toggleSort('logLrt')} class="num">log(1+score)</th>
-						<th on:click={() => toggleSort('betaPosDn')} class="num">dN⁺</th>
-						<th on:click={() => toggleSort('alphaDs')} class="num">dS</th>
+						{#if hasRates}
+							<th on:click={() => toggleSort('betaPosDn')} class="num">dN⁺</th>
+							<th on:click={() => toggleSort('alphaDs')} class="num">dS</th>
+						{/if}
 						<th on:click={() => toggleSort('zScore')} class="num">Z</th>
 						<th>Call</th>
 					</tr>
@@ -224,12 +235,16 @@
 								<td class="num mono">{row.percentile.toFixed(1)}</td>
 								<td class="num mono">{fmt(row.lrt)}</td>
 								<td class="num mono">{fmt(row.logLrt)}</td>
-								<td class="num mono">{fmt(row.betaPosDn)}</td>
-								<td class="num mono">{fmt(row.alphaDs)}</td>
+								{#if hasRates}
+									<td class="num mono">{fmt(row.betaPosDn)}</td>
+									<td class="num mono">{fmt(row.alphaDs)}</td>
+								{/if}
 								<td class="num mono">{fmt(row.zScore, 2)}</td>
 							{:else}
 								<!-- Zeroed before the model was consulted: "not applicable", not "no selection". -->
-								<td class="num unscored" colspan="6">not scored — no amino-acid variation</td>
+								<td class="num unscored" colspan={hasRates ? 6 : 4}
+									>not scored — no amino-acid variation</td
+								>
 							{/if}
 							<td>
 								<span class="axomeme-call" style="background:{tierColor(row.call)}22; color:{tierColor(row.call)}">
